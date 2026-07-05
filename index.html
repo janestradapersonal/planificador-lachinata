@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planificador La Chinata</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --olive-900:#2c3319;
+  --olive-800:#3d4a22;
+  --olive-700:#4e5d2b;
+  --olive-600:#647a36;
+  --olive-300:#a9bd82;
+  --olive-100:#e7ecd9;
+  --cream:#f6f4ec;
+  --paper:#ffffff;
+  --gold:#b8842e;
+  --gold-light:#e7c877;
+  --clay:#a6512f;
+  --ink:#242318;
+  --ink-soft:#5b5b4f;
+  --line:#dcd7c4;
+  --danger:#a6392b;
+  --ok:#5c7a3a;
+  --warn:#b8842e;
+  --radius:10px;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:var(--sans);
+  background:var(--cream);
+  color:var(--ink);
+  display:flex;
+  min-height:100vh;
+}
+::selection{background:var(--gold-light);}
+
+/* ---------- Sidebar ---------- */
+#sidebar{
+  width:230px;
+  min-width:230px;
+  background:linear-gradient(180deg,var(--olive-900),var(--olive-800));
+  color:var(--olive-100);
+  display:flex;
+  flex-direction:column;
+  padding:26px 0;
+}
+.brand{
+  padding:0 22px 22px 22px;
+  border-bottom:1px solid rgba(255,255,255,0.12);
+  margin-bottom:14px;
+}
+.brand-mark{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.brand-mark svg{flex:none;}
+.brand-title{
+  font-family:var(--serif);
+  font-size:19px;
+  line-height:1.15;
+  color:#fff;
+  letter-spacing:.2px;
+}
+.brand-sub{
+  margin-top:4px;
+  font-size:11px;
+  letter-spacing:1.6px;
+  text-transform:uppercase;
+  color:var(--olive-300);
+}
+nav.tabs{display:flex;flex-direction:column;gap:2px;padding:0 12px;}
+nav.tabs button{
+  all:unset;
+  cursor:pointer;
+  padding:11px 14px;
+  border-radius:8px;
+  font-size:14px;
+  color:var(--olive-100);
+  display:flex;
+  align-items:center;
+  gap:10px;
+  transition:background .15s ease, color .15s ease;
+}
+nav.tabs button .dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--olive-300);
+  flex:none;
+}
+nav.tabs button:hover{background:rgba(255,255,255,0.08);}
+nav.tabs button.active{background:var(--gold);color:#2c2410;font-weight:600;}
+nav.tabs button.active .dot{background:#2c2410;}
+.sidebar-footer{
+  margin-top:auto;
+  padding:16px 22px 0 22px;
+  font-size:11px;
+  color:var(--olive-300);
+  border-top:1px solid rgba(255,255,255,0.1);
+}
+
+/* ---------- Main ---------- */
+#main{flex:1;display:flex;flex-direction:column;min-width:0;}
+header.topbar{
+  padding:22px 34px 18px 34px;
+  border-bottom:1px solid var(--line);
+  background:var(--paper);
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:10px;
+}
+header.topbar h1{
+  font-family:var(--serif);
+  font-size:24px;
+  margin:0;
+  color:var(--olive-900);
+}
+header.topbar p{margin:2px 0 0 0;color:var(--ink-soft);font-size:13px;}
+#content{padding:28px 34px 60px 34px;flex:1;overflow-y:auto;}
+
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+.section-head h2{font-family:var(--serif);font-size:20px;margin:0;color:var(--olive-900);}
+.section-head .eyebrow{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:4px;display:block;}
+
+.btn{
+  all:unset;cursor:pointer;
+  padding:9px 16px;
+  border-radius:7px;
+  font-size:13px;
+  font-weight:600;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn-primary{background:var(--olive-700);color:#fff;}
+.btn-primary:hover{background:var(--olive-800);}
+.btn-gold{background:var(--gold);color:#2c2410;}
+.btn-gold:hover{background:#a67527;}
+.btn-ghost{background:transparent;color:var(--olive-800);border:1px solid var(--line);}
+.btn-ghost:hover{background:var(--olive-100);}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid #e3c9c3;}
+.btn-danger:hover{background:#f7ece9;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+
+table{width:100%;border-collapse:collapse;background:var(--paper);border-radius:var(--radius);overflow:hidden;box-shadow:0 1px 0 var(--line);}
+thead th{
+  text-align:left;
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.8px;
+  color:var(--ink-soft);
+  background:var(--olive-100);
+  padding:10px 12px;
+  border-bottom:1px solid var(--line);
+}
+tbody td{padding:10px 12px;font-size:13.5px;border-bottom:1px solid var(--line);vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:#fbfaf5;}
+.tag{
+  display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;
+}
+.tag-on{background:#e7f0dc;color:var(--ok);}
+.tag-off{background:#f2e3df;color:var(--danger);}
+.tag-neutral{background:var(--olive-100);color:var(--olive-800);}
+.muted{color:var(--ink-soft);font-size:12.5px;}
+.empty-state{
+  border:1px dashed var(--line);border-radius:var(--radius);padding:40px 20px;text-align:center;color:var(--ink-soft);background:var(--paper);
+}
+.empty-state h3{font-family:var(--serif);color:var(--olive-800);margin:0 0 6px 0;}
+
+/* modal */
+.overlay{
+  position:fixed;inset:0;background:rgba(36,35,24,0.45);
+  display:none;align-items:flex-start;justify-content:center;
+  padding:40px 20px;overflow-y:auto;z-index:50;
+}
+.overlay.open{display:flex;}
+.modal{
+  background:var(--paper);border-radius:12px;max-width:560px;width:100%;
+  box-shadow:0 20px 50px rgba(0,0,0,0.25);
+  padding:26px 26px 22px 26px;
+}
+.modal h3{font-family:var(--serif);margin:0 0 4px 0;color:var(--olive-900);font-size:19px;}
+.modal .sub{margin:0 0 18px 0;font-size:12.5px;color:var(--ink-soft);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;}
+.form-grid .full{grid-column:1 / -1;}
+label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:5px;font-weight:600;}
+input[type=text],input[type=number],input[type=time],select,textarea{
+  width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:7px;font-size:13.5px;
+  background:#fff;color:var(--ink);font-family:var(--sans);
+}
+textarea{resize:vertical;min-height:56px;}
+.checkbox-row{display:flex;align-items:center;gap:8px;padding-top:22px;}
+.checkbox-row input{width:16px;height:16px;}
+.days-grid{display:flex;gap:6px;flex-wrap:wrap;}
+.day-chip{
+  border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:12px;cursor:pointer;user-select:none;color:var(--ink-soft);
+}
+.day-chip.selected{background:var(--olive-700);border-color:var(--olive-700);color:#fff;}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;}
+
+/* cards for tiendas */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:16px;}
+.card h4{margin:0 0 8px 0;font-family:var(--serif);color:var(--olive-900);font-size:16px;}
+.card .row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-soft);padding:3px 0;}
+.card .row b{color:var(--ink);font-weight:600;}
+.card .card-actions{display:flex;gap:8px;margin-top:12px;}
+
+/* horario grid */
+.hor-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+.hor-table-wrap{overflow-x:auto;border-radius:var(--radius);box-shadow:0 1px 0 var(--line);}
+table.hor{min-width:920px;}
+table.hor th.day-col{text-align:center;}
+table.hor td.day-cell{text-align:center;padding:6px 8px;}
+.shift-pill{
+  display:inline-block;background:var(--olive-100);color:var(--olive-800);border-radius:7px;
+  padding:4px 7px;font-size:11.5px;font-weight:600;line-height:1.3;
+}
+.shift-pill.rest{background:#f1efe6;color:var(--ink-soft);font-weight:500;}
+.shift-pill.fixed{background:#efe0c2;color:#7a5a15;}
+.coverage-banner{
+  border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;gap:10px;align-items:flex-start;
+}
+.coverage-ok{background:#e9f2df;color:var(--ok);border:1px solid #cfe4b8;}
+.coverage-warn{background:#fbf1de;color:#8a6412;border:1px solid #efd9a3;}
+.coverage-info{background:#e9f0f5;color:#3a5f7a;border:1px solid #c9dbe6;}
+.badge-count{font-weight:700;}
+
+.two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;align-items:start;}
+@media (max-width:980px){.two-col{grid-template-columns:1fr;}}
+
+.pane{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:18px;}
+.pane h3{margin:0 0 4px 0;font-family:var(--serif);font-size:16px;color:var(--olive-900);}
+.pane .sub{margin:0 0 14px 0;font-size:12px;color:var(--ink-soft);}
+
+.rule-row{border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.rule-desc{font-size:13px;}
+.rule-desc b{color:var(--olive-800);}
+.rule-meta{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+
+.toast{
+  position:fixed;bottom:22px;right:22px;background:var(--olive-900);color:#fff;padding:12px 18px;
+  border-radius:9px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,0.25);z-index:100;opacity:0;
+  transform:translateY(8px);transition:all .25s ease;pointer-events:none;
+}
+.toast.show{opacity:1;transform:translateY(0);}
+
+@media print{
+  #sidebar, header.topbar, .toolbar, .hor-toolbar, .btn, .section-head .eyebrow ~ h2 ~ *{display:none !important;}
+  body{background:#fff;}
+  #content{padding:0;}
+}
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg width="30" height="30" viewBox="0 0 48 48" fill="none">
+        <path d="M24 4C24 4 12 12 12 26C12 35 17.5 41 24 44C30.5 41 36 35 36 26C36 12 24 4 24 4Z" fill="#b8842e"/>
+        <path d="M24 10C24 10 17 16 17 26C17 32 20 36 24 38.5C28 36 31 32 31 26C31 16 24 10 24 10Z" fill="#4e5d2b"/>
+      </svg>
+      <div>
+        <div class="brand-title">La Chinata</div>
+        <div class="brand-sub">Planificador</div>
+      </div>
+    </div>
+  </div>
+  <nav class="tabs" id="nav-tabs"></nav>
+  <div class="sidebar-footer">Datos guardados en tu navegador · sin conexión externa</div>
+</aside>
+
+<div id="main">
+  <header class="topbar">
+    <div>
+      <h1 id="page-title">Empleados</h1>
+      <p id="page-sub">Gestiona el equipo, sus contratos y condiciones.</p>
+    </div>
+  </header>
+  <div id="content"></div>
+</div>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal-root"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================================
+   PLANIFICADOR LA CHINATA — versión web (HTML/JS autocontenido)
+   -------------------------------------------------------------------------
+   Estructura organizada por capas, replicando la arquitectura solicitada
+   para el proyecto de escritorio en Python:
+
+     Database   -> persistencia (aquí: window.storage, equivalente a SQLite)
+     Models     -> Empleado, Tienda, Regla, Horario (solo datos)
+     Services   -> EmpleadoService, TiendaService, ReglaService,
+                   GeneradorService (motor de turnos), ExportService
+     GUI        -> renderizado de pestañas (Empleados, Tiendas, Reglas,
+                   Horarios, Configuración)
+
+   NOTA IMPORTANTE SOBRE EL MOTOR:
+   En un navegador no es posible ejecutar Google OR-Tools (CP-SAT), que es
+   una librería nativa de Python/C++. El GeneradorService de aquí aplica
+   una estrategia determinista por restricciones (sin aleatoriedad alguna,
+   igual que pide la especificación), evaluando cada restricción como una
+   función independiente. No es un solver ILP de óptimo garantizado como
+   CP-SAT, sino un asignador determinista + un panel de validación que
+   señala qué restricciones no se cumplen para poder ajustarlas a mano.
+   ========================================================================= */
+
+const DIAS = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+const CONTRATOS = [40,30,25];
+const JORNADAS_PERMITIDAS = { 40:[8], 30:[3,6,8], 25:[3,6,8] };
+const PATRONES_PARTIDO = { 6:["3+3"], 8:["3+5","5+3","4+4"] };
+
+/** "HH:MM" -> minutos desde las 00:00. Devuelve null si no es un formato válido. */
+function minutosDesde(hhmm){
+  if(!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
+  const [h,m] = hhmm.split(":").map(Number);
+  return h*60+m;
+}
+/** "HH:MM-HH:MM" -> [inicio,fin] si es parseable, o [texto,""] como respaldo. */
+function parseHorarioFijo(texto){
+  const m = (texto||"").match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+  return m ? [m[1], m[2]] : [texto || "", ""];
+}
+/** Horas (decimal) entre dos "HH:MM", o 0 si no es calculable. */
+function diffHoras(inicio, fin){
+  const a = minutosDesde(inicio), b = minutosDesde(fin);
+  if(a === null || b === null) return 0;
+  return Math.round(((b-a)/60)*100)/100;
+}
+
+/* -------------------------------------------------------------------------
+   DATABASE — capa única de persistencia (equivalente a database/database.py)
+   ------------------------------------------------------------------------- */
+class Database {
+  constructor(){ this._cache = {}; this._ready = typeof window.storage !== "undefined"; }
+
+  async _get(key, fallback){
+    if(!this._ready) return this._cache[key] ?? fallback;
+    try{
+      const res = await window.storage.get(key, false);
+      return res ? JSON.parse(res.value) : fallback;
+    }catch(e){ return this._cache[key] ?? fallback; }
+  }
+  async _set(key, value){
+    this._cache[key] = value;
+    if(!this._ready) return;
+    try{ await window.storage.set(key, JSON.stringify(value), false); }
+    catch(e){ /* se mantiene en caché de memoria si falla el almacenamiento */ }
+  }
+
+  getEmpleados(){ return this._get("empleados", []); }
+  saveEmpleados(list){ return this._set("empleados", list); }
+
+  getTiendas(){ return this._get("tiendas", []); }
+  saveTiendas(list){ return this._set("tiendas", list); }
+
+  getReglas(){ return this._get("reglas", []); }
+  saveReglas(list){ return this._set("reglas", list); }
+
+  getConfig(){ return this._get("config", {}); }
+  saveConfig(cfg){ return this._set("config", cfg); }
+
+  getHorario(){ return this._get("horario_generado", null); }
+  saveHorario(h){ return this._set("horario_generado", h); }
+}
+
+/* -------------------------------------------------------------------------
+   MODELS — solo representan datos (equivalente a models/*.py)
+   ------------------------------------------------------------------------- */
+class Empleado {
+  constructor({id, nombre, contrato, horasSemanales, tiendaFija, puedeCambiarTienda,
+               puedeTurnoPartido, diasDescansoFijos, horarioFijo, observaciones, activo}){
+    this.id = id ?? crypto.randomUUID();
+    this.nombre = nombre ?? "";
+    this.contrato = contrato ?? 40;
+    this.horasSemanales = horasSemanales ?? contrato ?? 40;
+    this.tiendaFija = tiendaFija ?? null;
+    this.puedeCambiarTienda = !!puedeCambiarTienda;
+    this.puedeTurnoPartido = !!puedeTurnoPartido;
+    this.diasDescansoFijos = diasDescansoFijos ?? [];
+    this.horarioFijo = horarioFijo ?? "";
+    this.observaciones = observaciones ?? "";
+    this.activo = activo === undefined ? true : !!activo;
+  }
+}
+
+class Tienda {
+  constructor({id, nombre, horaApertura, horaCierre, personasApertura, personasCierre}){
+    this.id = id ?? crypto.randomUUID();
+    this.nombre = nombre ?? "";
+    this.horaApertura = horaApertura ?? "10:00";
+    this.horaCierre = horaCierre ?? "20:00";
+    this.personasApertura = personasApertura ?? 1;
+    this.personasCierre = personasCierre ?? 1;
+  }
+}
+
+class Regla {
+  // tipo: "tienda_fija_dia" | "turno_seguido_tienda" | "horario_fijo" | "dotacion_dia" | "personalizada"
+  // obligatoria=true  -> el motor la aplica siempre / se valida como incumplimiento grave si no se cumple
+  // obligatoria=false -> es una preferencia: se intenta respetar pero no bloquea nada si no se puede
+  // codigo -> solo para tipo "personalizada": cuerpo de función JS que valida el horario generado
+  constructor({id, tipo, empleadoId, dias, tiendaId, valor, descripcion, activa, obligatoria, codigo}){
+    this.id = id ?? crypto.randomUUID();
+    this.tipo = tipo ?? "tienda_fija_dia";
+    this.empleadoId = empleadoId ?? null;
+    this.dias = dias ?? [];
+    this.tiendaId = tiendaId ?? null;
+    this.valor = valor ?? null; // p.ej. número de personas para dotacion_dia
+    this.descripcion = descripcion ?? "";
+    this.activa = activa === undefined ? true : !!activa;
+    this.obligatoria = obligatoria === undefined ? true : !!obligatoria;
+    this.codigo = codigo ?? "";
+  }
+}
+
+class Turno {
+  constructor({empleadoId, dia, tiendaId, bloques, horas, tipo}){
+    this.empleadoId = empleadoId;
+    this.dia = dia;
+    this.tiendaId = tiendaId;
+    this.bloques = bloques; // [[inicio,fin], ...]
+    this.horas = horas;
+    this.tipo = tipo; // "descanso" | "fijo" | "jornada" | "partido"
+  }
+}
+
+/* -------------------------------------------------------------------------
+   SERVICES — toda la lógica de negocio (equivalente a services/*.py)
+   ------------------------------------------------------------------------- */
+class EmpleadoService {
+  constructor(db){ this.db = db; }
+  async listar(){ return (await this.db.getEmpleados()).map(e => new Empleado(e)); }
+  async crear(datos){
+    const lista = await this.db.getEmpleados();
+    const emp = new Empleado(datos);
+    lista.push(emp);
+    await this.db.saveEmpleados(lista);
+    return emp;
+  }
+  async actualizar(id, datos){
+    const lista = await this.db.getEmpleados();
+    const idx = lista.findIndex(e => e.id === id);
+    if(idx === -1) throw new Error("Empleado no encontrado");
+    lista[idx] = new Empleado({...lista[idx], ...datos, id});
+    await this.db.saveEmpleados(lista);
+    return lista[idx];
+  }
+  async eliminar(id){
+    const lista = (await this.db.getEmpleados()).filter(e => e.id !== id);
+    await this.db.saveEmpleados(lista);
+  }
+  async alternarActivo(id){
+    const lista = await this.db.getEmpleados();
+    const idx = lista.findIndex(e => e.id === id);
+    if(idx === -1) return;
+    lista[idx].activo = !lista[idx].activo;
+    await this.db.saveEmpleados(lista);
+  }
+}
+
+class TiendaService {
+  constructor(db){ this.db = db; }
+  async listar(){ return (await this.db.getTiendas()).map(t => new Tienda(t)); }
+  async crear(datos){
+    const lista = await this.db.getTiendas();
+    const tienda = new Tienda(datos);
+    lista.push(tienda);
+    await this.db.saveTiendas(lista);
+    return tienda;
+  }
+  async actualizar(id, datos){
+    const lista = await this.db.getTiendas();
+    const idx = lista.findIndex(t => t.id === id);
+    if(idx === -1) throw new Error("Tienda no encontrada");
+    lista[idx] = new Tienda({...lista[idx], ...datos, id});
+    await this.db.saveTiendas(lista);
+    return lista[idx];
+  }
+  async eliminar(id){
+    const lista = (await this.db.getTiendas()).filter(t => t.id !== id);
+    await this.db.saveTiendas(lista);
+  }
+}
+
+class ReglaService {
+  constructor(db){ this.db = db; }
+  async listar(){ return (await this.db.getReglas()).map(r => new Regla(r)); }
+  async crear(datos){
+    const lista = await this.db.getReglas();
+    const regla = new Regla(datos);
+    lista.push(regla);
+    await this.db.saveReglas(lista);
+    return regla;
+  }
+  async eliminar(id){
+    const lista = (await this.db.getReglas()).filter(r => r.id !== id);
+    await this.db.saveReglas(lista);
+  }
+  async alternarActiva(id){
+    const lista = await this.db.getReglas();
+    const idx = lista.findIndex(r => r.id === id);
+    if(idx === -1) return;
+    lista[idx].activa = !lista[idx].activa;
+    await this.db.saveReglas(lista);
+  }
+}
+
+/* ---- GeneradorService: motor de turnos por restricciones ---- */
+class GeneradorService {
+  constructor(empleados, tiendas, reglas, config){
+    this.empleados = empleados.filter(e => e.activo);
+    this.tiendas = tiendas;
+    const activas = reglas.filter(r => r.activa);
+    this.reglasObligatorias = activas.filter(r => r.obligatoria);
+    this.reglasPreferencia = activas.filter(r => !r.obligatoria);
+    this.config = config;
+  }
+
+  /** Restricción: tienda asignada a un empleado en un día concreto.
+   *  Prioridad: 1) regla obligatoria de tienda fija ese día,
+   *             2) regla de preferencia de tienda fija ese día,
+   *             3) tienda fija por defecto del empleado. */
+  restriccion_tiendaDelDia(empleado, dia){
+    const obligatoria = this.reglasObligatorias.find(r =>
+      r.tipo === "tienda_fija_dia" && r.empleadoId === empleado.id && r.dias.includes(dia));
+    if(obligatoria) return obligatoria.tiendaId;
+    const preferencia = this.reglasPreferencia.find(r =>
+      r.tipo === "tienda_fija_dia" && r.empleadoId === empleado.id && r.dias.includes(dia));
+    if(preferencia) return preferencia.tiendaId;
+    return empleado.tiendaFija;
+  }
+
+  /** Restricción: si el empleado tiene horario fijo, se respeta tal cual. */
+  restriccion_horarioFijo(empleado){
+    return empleado.horarioFijo && empleado.horarioFijo.trim().length > 0;
+  }
+
+  /** Restricción: días de descanso fijos del empleado. */
+  restriccion_esDescanso(empleado, dia){
+    return empleado.diasDescansoFijos.includes(dia);
+  }
+
+  /** Restricción: jornadas permitidas según contrato (40h->8h ; 30/25h->3,6,8h). */
+  restriccion_jornadasPermitidas(empleado){
+    return JORNADAS_PERMITIDAS[empleado.contrato] || [8];
+  }
+
+  /** Restricción: reparto determinista de horas semanales en jornadas diarias. */
+  restriccion_repartoHoras(empleado){
+    const diasTrabajo = DIAS.filter(d => !this.restriccion_esDescanso(empleado, d));
+    const permitidas = [...this.restriccion_jornadasPermitidas(empleado)].sort((a,b)=>b-a);
+    let restante = empleado.horasSemanales;
+    const plan = {};
+    for(const dia of diasTrabajo){
+      if(restante <= 0){ plan[dia] = 0; continue; }
+      // elige, de forma determinista, la jornada más grande que no sobrepase
+      // lo que queda repartir entre los días de trabajo restantes
+      const diasQueQuedan = diasTrabajo.length - diasTrabajo.indexOf(dia);
+      const objetivo = restante / diasQueQuedan;
+      let elegido = permitidas.find(h => h <= objetivo) ?? permitidas[permitidas.length-1];
+      if(elegido > restante) elegido = permitidas.find(h => h <= restante) ?? 0;
+      plan[dia] = elegido;
+      restante -= elegido;
+    }
+    return plan;
+  }
+
+  /** Restricción: patrón de turno partido determinista para una jornada dada. */
+  restriccion_patronPartido(empleado, horasJornada){
+    if(!empleado.puedeTurnoPartido) return null;
+    const patrones = PATRONES_PARTIDO[horasJornada];
+    return patrones ? patrones[0] : null; // primer patrón válido, sin aleatoriedad
+  }
+
+  /** Restricción: construye los bloques horarios reales a partir de la tienda y el patrón. */
+  restriccion_bloquesHorario(tienda, horasJornada, patron){
+    if(!tienda) return [["09:00", this._sumarHoras("09:00,", horasJornada)]];
+    const apertura = tienda.horaApertura;
+    if(!patron){
+      return [[apertura, this._sumarHoras(apertura, horasJornada)]];
+    }
+    const [a,b] = patron.split("+").map(Number);
+    const bloque1Fin = this._sumarHoras(apertura, a);
+    const inicioBloque2 = this._sumarHoras(tienda.horaCierre, -b);
+    return [[apertura, bloque1Fin], [inicioBloque2, tienda.horaCierre]];
+  }
+
+  _sumarHoras(hhmm, delta){
+    const [h,m] = hhmm.split(":").map(Number);
+    let total = h*60 + m + Math.round(delta*60);
+    total = ((total % (24*60)) + 24*60) % (24*60);
+    const hh = String(Math.floor(total/60)).padStart(2,"0");
+    const mm = String(total%60).padStart(2,"0");
+    return `${hh}:${mm}`;
+  }
+
+  /** Restricción OBLIGATORIA: nunca puede haber una franja sin ninguna persona en tienda
+   *  durante el horario de apertura. Es la única restricción que no depende de reglas
+   *  configurables: siempre está activa. */
+  restriccion_siempreHayAlguien(tienda, turnosDeLaTienda){
+    const slots = generarSlotsHorarios(tienda);
+    const huecos = slots.filter(slot => empleadosEnSlot(turnosDeLaTienda, slot).length === 0);
+    return { cumple: huecos.length === 0, huecos: huecos.map(s => `${minutosATexto(s[0])}–${minutosATexto(s[1])}`) };
+  }
+
+  /** Restricción: cobertura mínima de apertura/cierre por tienda y día (regla de negocio, obligatoria). */
+  restriccion_coberturaTienda(tienda, turnosDeLaTienda){
+    const cubreApertura = t => t.bloques.some(([ini]) => ini <= tienda.horaApertura);
+    const cubreCierre = t => t.bloques.some(([,fin]) => fin >= tienda.horaCierre);
+    const apertura = turnosDeLaTienda.filter(cubreApertura).length;
+    const cierre = turnosDeLaTienda.filter(cubreCierre).length;
+    return {
+      apertura, cierre,
+      cumpleApertura: apertura >= tienda.personasApertura,
+      cumpleCierre: cierre >= tienda.personasCierre
+    };
+  }
+
+  /** Restricción: dotación exigida por una regla "dotacion_dia" (obligatoria o preferencia). */
+  restriccion_dotacionRegla(regla, turnos){
+    let total = 0;
+    for(const dia of regla.dias){
+      total += turnos.filter(t => t.dia === dia && t.tipo !== "descanso").length;
+    }
+    return { actual: total, objetivo: regla.valor, cumple: total === regla.valor };
+  }
+
+  /** Restricción PERSONALIZADA: ejecuta código JS definido por el usuario para validar
+   *  el horario ya generado. El código recibe (turnos, empleados, tiendas, DIAS, utils)
+   *  y debe devolver `true`/`false` o `{cumple, mensaje}`. Cualquier error de ejecución
+   *  se trata como incumplimiento, para que nunca rompa la generación del horario. */
+  restriccion_codigoPersonalizado(regla, turnos){
+    try{
+      const fn = new Function("turnos", "empleados", "tiendas", "DIAS", "utils", regla.codigo);
+      const utils = { minutosDesde, minutosATexto, diffHoras, generarSlotsHorarios, empleadosEnSlot };
+      const resultado = fn(turnos, this.empleados, this.tiendas, DIAS, utils);
+      if(typeof resultado === "boolean") return { cumple: resultado, mensaje: regla.descripcion || "Regla personalizada" };
+      if(resultado && typeof resultado === "object") return { cumple: !!resultado.cumple, mensaje: resultado.mensaje || regla.descripcion };
+      return { cumple: true, mensaje: "" };
+    }catch(e){
+      return { cumple: false, mensaje: `Error en la regla "${regla.descripcion || "personalizada"}": ${e.message}` };
+    }
+  }
+
+  /** Genera el horario semanal completo aplicando todas las restricciones. */
+  generar(){
+    const turnos = [];
+    for(const empleado of this.empleados){
+      if(this.restriccion_horarioFijo(empleado)){
+        for(const dia of DIAS){
+          if(this.restriccion_esDescanso(empleado, dia)) continue;
+          const tiendaId = this.restriccion_tiendaDelDia(empleado, dia);
+          turnos.push(new Turno({
+            empleadoId: empleado.id, dia, tiendaId,
+            bloques: [parseHorarioFijo(empleado.horarioFijo)], horas: diffHoras(...parseHorarioFijo(empleado.horarioFijo)), tipo: "fijo"
+          }));
+        }
+        continue;
+      }
+      const plan = this.restriccion_repartoHoras(empleado);
+      for(const dia of DIAS){
+        if(this.restriccion_esDescanso(empleado, dia)){
+          turnos.push(new Turno({empleadoId: empleado.id, dia, tiendaId:null, bloques:[], horas:0, tipo:"descanso"}));
+          continue;
+        }
+        const horasJornada = plan[dia] || 0;
+        if(horasJornada === 0){
+          turnos.push(new Turno({empleadoId: empleado.id, dia, tiendaId:null, bloques:[], horas:0, tipo:"descanso"}));
+          continue;
+        }
+        const tiendaId = this.restriccion_tiendaDelDia(empleado, dia);
+        const tienda = this.tiendas.find(t => t.id === tiendaId);
+        const patron = this.restriccion_patronPartido(empleado, horasJornada);
+        const bloques = this.restriccion_bloquesHorario(tienda, horasJornada, patron);
+        turnos.push(new Turno({
+          empleadoId: empleado.id, dia, tiendaId, bloques, horas: horasJornada,
+          tipo: patron ? "partido" : "jornada"
+        }));
+      }
+    }
+
+    // Validación de restricciones: las obligatorias generan "avisos" (bloqueantes/graves);
+    // las preferencias generan "preferenciasNoCumplidas" (informativas, no bloqueantes).
+    const avisos = [];
+    const preferenciasNoCumplidas = [];
+
+    // 1) Reglas de dotación por día (obligatorias o preferencia), definidas por el usuario
+    for(const regla of [...this.reglasObligatorias, ...this.reglasPreferencia]){
+      if(regla.tipo !== "dotacion_dia") continue;
+      const res = this.restriccion_dotacionRegla(regla, turnos);
+      if(!res.cumple){
+        const texto = `${regla.dias.join(", ")}: hay ${res.actual} personas trabajando, el objetivo son ${res.objetivo}.`;
+        (regla.obligatoria ? avisos : preferenciasNoCumplidas).push(texto);
+      }
+    }
+
+    // 1b) Reglas personalizadas (código JS), obligatorias o preferencia
+    for(const regla of [...this.reglasObligatorias, ...this.reglasPreferencia]){
+      if(regla.tipo !== "personalizada" || !regla.codigo || !regla.codigo.trim()) continue;
+      const res = this.restriccion_codigoPersonalizado(regla, turnos);
+      if(!res.cumple){
+        (regla.obligatoria ? avisos : preferenciasNoCumplidas).push(res.mensaje);
+      }
+    }
+
+    // 2) Dotación mínima de apertura/cierre por tienda (regla de negocio fija, obligatoria)
+    for(const dia of DIAS){
+      for(const tienda of this.tiendas){
+        const deLaTienda = turnos.filter(t => t.dia === dia && t.tiendaId === tienda.id && t.tipo !== "descanso");
+        const cob = this.restriccion_coberturaTienda(tienda, deLaTienda);
+        if(!cob.cumpleApertura) avisos.push(`${tienda.nombre} · ${dia}: cobertura de apertura ${cob.apertura}/${tienda.personasApertura}.`);
+        if(!cob.cumpleCierre) avisos.push(`${tienda.nombre} · ${dia}: cobertura de cierre ${cob.cierre}/${tienda.personasCierre}.`);
+
+        // 3) Nunca puede haber una franja sin nadie en tienda (obligatoria, no configurable)
+        const siempre = this.restriccion_siempreHayAlguien(tienda, deLaTienda);
+        if(!siempre.cumple){
+          avisos.push(`${tienda.nombre} · ${dia}: sin nadie en tienda entre ${siempre.huecos.join(", ")}.`);
+        }
+      }
+    }
+
+    return { turnos, avisos, preferenciasNoCumplidas, generadoEl: new Date().toISOString() };
+  }
+}
+
+/* ---- ExportService: exportación a Excel / impresión a PDF ---- */
+class ExportService {
+  constructor(empleados, tiendas){ this.empleados = empleados; this.tiendas = tiendas; }
+
+  _empleadoNombre(id){ return this.empleados.find(e => e.id === id)?.nombre ?? "—"; }
+  _tiendaNombre(id){ return this.tiendas.find(t => t.id === id)?.nombre ?? "—"; }
+
+  _filaTexto(turno){
+    if(turno.tipo === "descanso") return "Descanso";
+    if(turno.tipo === "fijo") return `Fijo ${turno.bloques[0][0]}${turno.bloques[0][1] ? "-"+turno.bloques[0][1] : ""}`;
+    return turno.bloques.map(b => `${b[0]}-${b[1]}`).join(" / ");
+  }
+
+  exportarExcel(horario){
+    const wb = XLSX.utils.book_new();
+
+    // Hoja 1: horario semanal por empleado
+    const rows = [["Empleado", ...DIAS]];
+    for(const empleado of this.empleados){
+      const fila = [empleado.nombre];
+      for(const dia of DIAS){
+        const turno = horario.turnos.find(t => t.empleadoId === empleado.id && t.dia === dia);
+        fila.push(turno ? `${this._filaTexto(turno)}${turno.tiendaId ? " · "+this._tiendaNombre(turno.tiendaId) : ""}` : "");
+      }
+      rows.push(fila);
+    }
+    const wsHorario = XLSX.utils.aoa_to_sheet(rows);
+    wsHorario['!cols'] = [{wch:20}, ...DIAS.map(()=>({wch:22}))];
+    XLSX.utils.book_append_sheet(wb, wsHorario, "Horario semanal");
+
+    // Hoja 2: horas contrato vs horas efectivas
+    const filasHoras = [["Empleado", "Contrato (h)", "Objetivo semanal (h)", "Horas efectivas (h)", "Diferencia (h)"]];
+    for(const empleado of this.empleados){
+      const efectivas = horasEfectivasEmpleado(empleado.id, horario.turnos);
+      filasHoras.push([empleado.nombre, empleado.contrato, empleado.horasSemanales, efectivas, Math.round((efectivas-empleado.horasSemanales)*100)/100]);
+    }
+    const wsHoras = XLSX.utils.aoa_to_sheet(filasHoras);
+    wsHoras['!cols'] = [{wch:20},{wch:14},{wch:20},{wch:18},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, wsHoras, "Horas contrato vs efectivas");
+
+    // Hoja 3+: cobertura hora a hora por tienda
+    for(const tienda of this.tiendas){
+      const { slots, tabla } = calcularCoberturaTienda(tienda, horario.turnos, this.empleados);
+      const filas = [["Hora", ...DIAS]];
+      slots.forEach((slot, i) => {
+        const etiqueta = `${minutosATexto(slot[0])}–${minutosATexto(slot[1])}`;
+        const fila = [etiqueta];
+        for(const dia of DIAS){
+          const nombres = tabla[dia][i];
+          fila.push(nombres.length ? nombres.join(", ") : "—");
+        }
+        filas.push(fila);
+      });
+      const wsCob = XLSX.utils.aoa_to_sheet(filas);
+      wsCob['!cols'] = [{wch:14}, ...DIAS.map(()=>({wch:24}))];
+      XLSX.utils.book_append_sheet(wb, wsCob, `Cobertura ${tienda.nombre}`.slice(0,31));
+    }
+
+    XLSX.writeFile(wb, "planificador-la-chinata.xlsx");
+  }
+
+  exportarPDF(){
+    window.print();
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Utilidades compartidas: cobertura hora a hora y horas efectivas.
+   Se usan tanto en la GUI (tablas en pantalla) como en la exportación.
+   ------------------------------------------------------------------------- */
+
+/** Franjas de 1h entre la apertura y el cierre de una tienda, en minutos. */
+function generarSlotsHorarios(tienda){
+  const inicio = minutosDesde(tienda.horaApertura);
+  const fin = minutosDesde(tienda.horaCierre);
+  const slots = [];
+  let t = inicio;
+  while(t < fin){
+    const siguiente = Math.min(t+60, fin);
+    slots.push([t, siguiente]);
+    t = siguiente;
+  }
+  return slots;
+}
+function minutosATexto(min){
+  const hh = String(Math.floor(min/60)).padStart(2,"0");
+  const mm = String(min%60).padStart(2,"0");
+  return `${hh}:${mm}`;
+}
+/** Empleados cuyo turno solapa una franja [inicioMin, finMin) ese día. */
+function empleadosEnSlot(turnosDiaTienda, slot){
+  const [s,e] = slot;
+  return turnosDiaTienda.filter(t => t.tipo !== "descanso" && t.bloques.some(([bi,bf]) => {
+    const bim = minutosDesde(bi), bfm = minutosDesde(bf);
+    if(bim === null || bfm === null) return false;
+    return bim < e && bfm > s;
+  }));
+}
+/** Matriz hora x día con los nombres presentes en una tienda, franja a franja. */
+function calcularCoberturaTienda(tienda, turnosSemana, empleados){
+  const slots = generarSlotsHorarios(tienda);
+  const tabla = {};
+  for(const dia of DIAS){
+    const turnosDiaTienda = turnosSemana.filter(t => t.dia === dia && t.tiendaId === tienda.id);
+    tabla[dia] = slots.map(slot => empleadosEnSlot(turnosDiaTienda, slot).map(t =>
+      empleados.find(e => e.id === t.empleadoId)?.nombre ?? "?"
+    ));
+  }
+  return { slots, tabla };
+}
+/** Suma de horas realmente asignadas a un empleado en la semana generada. */
+function horasEfectivasEmpleado(empleadoId, turnosSemana){
+  return turnosSemana
+    .filter(t => t.empleadoId === empleadoId)
+    .reduce((acc, t) => acc + (t.horas || 0), 0);
+}
+
+/* =========================================================================
+   GUI — sin lógica de negocio, solo presentación (equivalente a gui/*.py)
+   ========================================================================= */
+const db = new Database();
+const empleadoService = new EmpleadoService(db);
+const tiendaService = new TiendaService(db);
+const reglaService = new ReglaService(db);
+
+const state = { tab: "empleados", empleados: [], tiendas: [], reglas: [], config: {}, horario: null, chat: [], chatCargando: false };
+
+const TABS = [
+  {id:"empleados", label:"Empleados", sub:"Gestiona el equipo, sus contratos y condiciones."},
+  {id:"tiendas", label:"Tiendas", sub:"Configura los puntos de venta y su dotación mínima."},
+  {id:"reglas", label:"Reglas", sub:"Condiciones particulares que el motor debe respetar."},
+  {id:"horarios", label:"Horarios", sub:"Genera y revisa la planificación semanal."},
+  {id:"configuracion", label:"Configuración", sub:"Parámetros globales de la planificación."},
+  {id:"chinatagpt", label:"ChinataGPT", sub:"Pregunta lo que quieras sobre el equipo y el horario."},
+];
+
+function toast(msg){
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>el.classList.remove("show"), 2400);
+}
+
+function renderNav(){
+  const nav = document.getElementById("nav-tabs");
+  nav.innerHTML = "";
+  for(const t of TABS){
+    const btn = document.createElement("button");
+    btn.className = t.id === state.tab ? "active" : "";
+    btn.innerHTML = `<span class="dot"></span>${t.label}`;
+    btn.onclick = () => { state.tab = t.id; renderAll(); };
+    nav.appendChild(btn);
+  }
+  const active = TABS.find(t => t.id === state.tab);
+  document.getElementById("page-title").textContent = active.label;
+  document.getElementById("page-sub").textContent = active.sub;
+}
+
+function closeModal(){ document.getElementById("overlay").classList.remove("open"); document.getElementById("modal-root").innerHTML = ""; }
+function openModal(html){
+  document.getElementById("modal-root").innerHTML = html;
+  document.getElementById("overlay").classList.add("open");
+}
+
+/* ---------------- EMPLEADOS ---------------- */
+function empleadosView(){
+  const rows = state.empleados.map(e => {
+    const tienda = state.tiendas.find(t => t.id === e.tiendaFija);
+    return `<tr>
+      <td><b>${e.nombre}</b>${e.observaciones ? `<div class="muted">${e.observaciones}</div>` : ""}</td>
+      <td>${e.contrato}h</td>
+      <td>${e.horasSemanales}h/sem</td>
+      <td>${tienda ? tienda.nombre : "<span class='muted'>Sin asignar</span>"}</td>
+      <td>${e.puedeCambiarTienda ? "<span class='tag tag-neutral'>Sí</span>" : "<span class='tag tag-neutral'>No</span>"}</td>
+      <td>${e.puedeTurnoPartido ? "<span class='tag tag-neutral'>Sí</span>" : "<span class='tag tag-neutral'>No</span>"}</td>
+      <td>${e.diasDescansoFijos.length ? e.diasDescansoFijos.join(", ") : "<span class='muted'>—</span>"}</td>
+      <td>${e.activo ? "<span class='tag tag-on'>Activo</span>" : "<span class='tag tag-off'>Inactivo</span>"}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-ghost btn-sm" onclick="abrirEmpleadoModal('${e.id}')">Editar</button>
+        <button class="btn btn-ghost btn-sm" onclick="handleAlternarActivo('${e.id}')">${e.activo ? "Desactivar" : "Activar"}</button>
+        <button class="btn btn-danger btn-sm" onclick="handleEliminarEmpleado('${e.id}')">Eliminar</button>
+      </td>
+    </tr>`;
+  }).join("");
+
+  return `
+    <div class="section-head">
+      <div><span class="eyebrow">Equipo</span><h2>Empleados</h2></div>
+      <button class="btn btn-primary" onclick="abrirEmpleadoModal()">+ Nuevo empleado</button>
+    </div>
+    ${state.empleados.length === 0 ? `
+      <div class="empty-state"><h3>Todavía no hay empleados</h3><p>Añade el primero para empezar a construir la planificación.</p></div>
+    ` : `
+      <table><thead><tr>
+        <th>Nombre</th><th>Contrato</th><th>Horas</th><th>Tienda fija</th>
+        <th>Cambia tienda</th><th>Turno partido</th><th>Descanso</th><th>Estado</th><th></th>
+      </tr></thead><tbody>${rows}</tbody></table>
+    `}`;
+}
+
+function empleadoModalHtml(emp){
+  const tiendasOpts = state.tiendas.map(t => `<option value="${t.id}" ${emp?.tiendaFija===t.id?"selected":""}>${t.nombre}</option>`).join("");
+  const diasChips = DIAS.map(d => `<div class="day-chip ${emp?.diasDescansoFijos?.includes(d)?"selected":""}" data-day="${d}" onclick="this.classList.toggle('selected')">${d.slice(0,3)}</div>`).join("");
+  return `
+    <h3>${emp ? "Editar empleado" : "Nuevo empleado"}</h3>
+    <p class="sub">Los campos marcados definen cómo participará en la generación de horarios.</p>
+    <div class="form-grid">
+      <div class="full"><label>Nombre</label><input type="text" id="f-nombre" value="${emp?.nombre ?? ""}"></div>
+      <div><label>Contrato (horas base)</label>
+        <select id="f-contrato">${CONTRATOS.map(c=>`<option value="${c}" ${emp?.contrato===c?"selected":""}>${c} horas</option>`).join("")}</select>
+      </div>
+      <div><label>Horas semanales</label><input type="number" id="f-horas" min="0" max="60" value="${emp?.horasSemanales ?? 40}"></div>
+      <div><label>Tienda fija</label><select id="f-tienda"><option value="">Sin asignar</option>${tiendasOpts}</select></div>
+      <div class="checkbox-row"><input type="checkbox" id="f-cambia" ${emp?.puedeCambiarTienda?"checked":""}><label style="margin:0;">Puede cambiar de tienda</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="f-partido" ${emp?.puedeTurnoPartido?"checked":""}><label style="margin:0;">Puede hacer turno partido</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="f-activo" ${emp?.activo ?? true ? "checked":""}><label style="margin:0;">Activo</label></div>
+      <div class="full"><label>Días de descanso fijos</label><div class="days-grid" id="f-dias">${diasChips}</div></div>
+      <div class="full"><label>Horario fijo (opcional, texto libre — anula el reparto automático)</label><input type="text" id="f-horariofijo" placeholder="p. ej. 09:00-17:00" value="${emp?.horarioFijo ?? ""}"></div>
+      <div class="full"><label>Observaciones</label><textarea id="f-obs">${emp?.observaciones ?? ""}</textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEmpleado(${emp ? `'${emp.id}'` : "null"})">Guardar</button>
+    </div>`;
+}
+
+window.abrirEmpleadoModal = (id) => {
+  const emp = id ? state.empleados.find(e => e.id === id) : null;
+  openModal(empleadoModalHtml(emp));
+};
+
+window.guardarEmpleado = async (id) => {
+  const dias = [...document.querySelectorAll("#f-dias .day-chip.selected")].map(el => el.dataset.day);
+  const datos = {
+    nombre: document.getElementById("f-nombre").value.trim(),
+    contrato: Number(document.getElementById("f-contrato").value),
+    horasSemanales: Number(document.getElementById("f-horas").value),
+    tiendaFija: document.getElementById("f-tienda").value || null,
+    puedeCambiarTienda: document.getElementById("f-cambia").checked,
+    puedeTurnoPartido: document.getElementById("f-partido").checked,
+    activo: document.getElementById("f-activo").checked,
+    diasDescansoFijos: dias,
+    horarioFijo: document.getElementById("f-horariofijo").value.trim(),
+    observaciones: document.getElementById("f-obs").value.trim(),
+  };
+  if(!datos.nombre){ toast("El nombre es obligatorio"); return; }
+  if(id) await empleadoService.actualizar(id, datos);
+  else await empleadoService.crear(datos);
+  closeModal();
+  await loadState();
+  toast(id ? "Empleado actualizado" : "Empleado creado");
+};
+
+window.handleAlternarActivo = async (id) => { await empleadoService.alternarActivo(id); await loadState(); };
+window.handleEliminarEmpleado = async (id) => {
+  if(!confirm("¿Eliminar este empleado? Esta acción no se puede deshacer.")) return;
+  await empleadoService.eliminar(id);
+  await loadState();
+  toast("Empleado eliminado");
+};
+
+/* ---------------- TIENDAS ---------------- */
+function tiendasView(){
+  const cards = state.tiendas.map(t => `
+    <div class="card">
+      <h4>${t.nombre}</h4>
+      <div class="row"><span>Apertura</span><b>${t.horaApertura}</b></div>
+      <div class="row"><span>Cierre</span><b>${t.horaCierre}</b></div>
+      <div class="row"><span>Personas apertura</span><b>${t.personasApertura}</b></div>
+      <div class="row"><span>Personas cierre</span><b>${t.personasCierre}</b></div>
+      <div class="card-actions">
+        <button class="btn btn-ghost btn-sm" onclick="abrirTiendaModal('${t.id}')">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="handleEliminarTienda('${t.id}')">Eliminar</button>
+      </div>
+    </div>`).join("");
+  return `
+    <div class="section-head">
+      <div><span class="eyebrow">Puntos de venta</span><h2>Tiendas</h2></div>
+      <button class="btn btn-primary" onclick="abrirTiendaModal()">+ Nueva tienda</button>
+    </div>
+    ${state.tiendas.length === 0 ? `<div class="empty-state"><h3>Todavía no hay tiendas</h3><p>Añade las tiendas para poder asignar empleados y turnos.</p></div>` : `<div class="card-grid">${cards}</div>`}`;
+}
+
+function tiendaModalHtml(t){
+  return `
+    <h3>${t ? "Editar tienda" : "Nueva tienda"}</h3>
+    <p class="sub">Estos datos definen la dotación mínima que exigirá el motor de horarios.</p>
+    <div class="form-grid">
+      <div class="full"><label>Nombre</label><input type="text" id="t-nombre" value="${t?.nombre ?? ""}"></div>
+      <div><label>Hora apertura</label><input type="time" id="t-apertura" value="${t?.horaApertura ?? "10:00"}"></div>
+      <div><label>Hora cierre</label><input type="time" id="t-cierre" value="${t?.horaCierre ?? "20:00"}"></div>
+      <div><label>Personas en apertura</label><input type="number" id="t-personas-a" min="0" value="${t?.personasApertura ?? 1}"></div>
+      <div><label>Personas en cierre</label><input type="number" id="t-personas-c" min="0" value="${t?.personasCierre ?? 1}"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarTienda(${t ? `'${t.id}'` : "null"})">Guardar</button>
+    </div>`;
+}
+
+window.abrirTiendaModal = (id) => {
+  const t = id ? state.tiendas.find(x => x.id === id) : null;
+  openModal(tiendaModalHtml(t));
+};
+window.guardarTienda = async (id) => {
+  const datos = {
+    nombre: document.getElementById("t-nombre").value.trim(),
+    horaApertura: document.getElementById("t-apertura").value,
+    horaCierre: document.getElementById("t-cierre").value,
+    personasApertura: Number(document.getElementById("t-personas-a").value),
+    personasCierre: Number(document.getElementById("t-personas-c").value),
+  };
+  if(!datos.nombre){ toast("El nombre es obligatorio"); return; }
+  if(id) await tiendaService.actualizar(id, datos);
+  else await tiendaService.crear(datos);
+  closeModal();
+  await loadState();
+  toast(id ? "Tienda actualizada" : "Tienda creada");
+};
+window.handleEliminarTienda = async (id) => {
+  if(!confirm("¿Eliminar esta tienda?")) return;
+  await tiendaService.eliminar(id);
+  await loadState();
+  toast("Tienda eliminada");
+};
+
+/* ---------------- REGLAS ---------------- */
+const TIPOS_REGLA = {
+  tienda_fija_dia: "Tienda fija en días concretos",
+  turno_seguido_tienda: "Tienda fija cuando el turno es seguido",
+  horario_fijo: "Horario fijo (informativo)",
+  dotacion_dia: "Dotación exigida un día concreto",
+  personalizada: "Personalizada (código JS)",
+};
+
+const CODIGO_EJEMPLO = `// Recibe: turnos, empleados, tiendas, DIAS, utils
+// Debes devolver: true/false, o { cumple, mensaje }
+// Ejemplo: nadie puede trabajar los 7 días de la semana
+for (const emp of empleados) {
+  const diasTrabajados = turnos.filter(t =>
+    t.empleadoId === emp.id && t.tipo !== "descanso"
+  ).length;
+  if (diasTrabajados >= 7) {
+    return { cumple: false, mensaje: emp.nombre + " trabaja los 7 días de la semana." };
+  }
+}
+return { cumple: true };`;
+
+function reglaDescripcion(r){
+  const emp = state.empleados.find(e => e.id === r.empleadoId)?.nombre ?? "—";
+  const tienda = state.tiendas.find(t => t.id === r.tiendaId)?.nombre ?? "—";
+  const cuanto = r.obligatoria ? "exactamente" : "preferiblemente";
+  switch(r.tipo){
+    case "tienda_fija_dia": return `<b>${emp}</b> ${r.obligatoria ? "siempre" : "preferiblemente"} en <b>${tienda}</b> los ${r.dias.join(", ")}`;
+    case "turno_seguido_tienda": return `<b>${emp}</b> siempre en <b>${tienda}</b> cuando hace turno seguido`;
+    case "horario_fijo": return `<b>${emp}</b> mantiene horario fijo`;
+    case "dotacion_dia": return `Los ${r.dias.join(", ")} trabajan ${cuanto} <b>${r.valor}</b> personas`;
+    case "personalizada": return `${r.descripcion || "Regla personalizada"} <span class="tag tag-neutral" style="margin-left:6px;">&lt;/&gt; código</span>`;
+    default: return r.descripcion;
+  }
+}
+
+function reglasView(){
+  const rows = state.reglas.map(r => `
+    <div class="rule-row">
+      <div>
+        <div class="rule-desc">${reglaDescripcion(r)}</div>
+        <div class="rule-meta">
+          <span class="tag ${r.obligatoria ? 'tag-off' : 'tag-neutral'}" style="${r.obligatoria ? 'background:#f2e3df;color:#8a3a26;' : ''}">${r.obligatoria ? "Obligatoria" : "Preferencia"}</span>
+          &nbsp;${TIPOS_REGLA[r.tipo]} ${r.activa ? "" : "· inactiva"}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="handleAlternarRegla('${r.id}')">${r.activa ? "Desactivar" : "Activar"}</button>
+        <button class="btn btn-danger btn-sm" onclick="handleEliminarRegla('${r.id}')">Eliminar</button>
+      </div>
+    </div>`).join("");
+  return `
+    <div class="section-head">
+      <div><span class="eyebrow">Motor de horarios</span><h2>Reglas</h2></div>
+      <button class="btn btn-primary" onclick="abrirReglaModal()">+ Nueva regla</button>
+    </div>
+    <p class="muted" style="margin:-8px 0 16px 0;">Las reglas <b>obligatorias</b> el motor las aplica siempre y, si no puede cumplirlas, lo marca como incidencia grave. Las de <b>preferencia</b> se aplican cuando es posible, y si no se cumplen solo aparecen como aviso informativo. El tipo <b>personalizada</b> te deja escribir tu propio código JS para validar cualquier condición que no cubran las demás.</p>
+    ${state.reglas.length === 0 ? `<div class="empty-state"><h3>Todavía no hay reglas</h3><p>Ejemplos: "Armando siempre en Diputación" (obligatoria) o "el lunes preferiblemente 10 personas" (preferencia).</p></div>` : rows}`;
+}
+
+function reglaModalHtml(){
+  const empleadosOpts = state.empleados.map(e => `<option value="${e.id}">${e.nombre}</option>`).join("");
+  const tiendasOpts = state.tiendas.map(t => `<option value="${t.id}">${t.nombre}</option>`).join("");
+  const diasChips = DIAS.map(d => `<div class="day-chip" data-day="${d}" onclick="this.classList.toggle('selected')">${d.slice(0,3)}</div>`).join("");
+  return `
+    <h3>Nueva regla</h3>
+    <p class="sub">Define condiciones particulares que el generador de horarios debe respetar.</p>
+    <div class="form-grid">
+      <div class="full"><label>Tipo de regla</label>
+        <select id="r-tipo" onchange="toggleReglaCampos()">
+          ${Object.entries(TIPOS_REGLA).map(([k,v]) => `<option value="${k}">${v}</option>`).join("")}
+        </select>
+      </div>
+      <div class="full"><label>Cumplimiento</label>
+        <select id="r-obligatoria">
+          <option value="true">Obligatoria — debe cumplirse siempre</option>
+          <option value="false">Preferencia — se cumple si es posible</option>
+        </select>
+      </div>
+      <div class="full" id="r-campo-empleado"><label>Empleado</label><select id="r-empleado"><option value="">—</option>${empleadosOpts}</select></div>
+      <div class="full" id="r-campo-tienda"><label>Tienda</label><select id="r-tienda"><option value="">—</option>${tiendasOpts}</select></div>
+      <div class="full" id="r-campo-dias"><label>Días</label><div class="days-grid" id="r-dias">${diasChips}</div></div>
+      <div class="full" id="r-campo-valor" style="display:none;"><label>Personas exigidas</label><input type="number" id="r-valor" min="0" value="9"></div>
+      <div class="full" id="r-campo-descripcion" style="display:none;"><label>Descripción (se muestra en la lista y en los avisos)</label><input type="text" id="r-descripcion" placeholder="p. ej. Nadie trabaja 7 días seguidos"></div>
+      <div class="full" id="r-campo-codigo" style="display:none;">
+        <label>Código JS de validación</label>
+        <textarea id="r-codigo" style="min-height:180px;font-family:monospace;font-size:12.5px;" spellcheck="false">${CODIGO_EJEMPLO}</textarea>
+        <p class="muted" style="margin-top:6px;">Variables disponibles: <code>turnos</code>, <code>empleados</code>, <code>tiendas</code>, <code>DIAS</code>, <code>utils</code> (con <code>minutosDesde</code>, <code>diffHoras</code>, etc.). Debe devolver <code>true</code>/<code>false</code> o <code>{cumple, mensaje}</code>. Si el código lanza un error, se trata como incumplimiento.</p>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarRegla()">Guardar</button>
+    </div>`;
+}
+
+window.toggleReglaCampos = () => {
+  const tipo = document.getElementById("r-tipo").value;
+  document.getElementById("r-campo-valor").style.display = tipo === "dotacion_dia" ? "" : "none";
+  document.getElementById("r-campo-empleado").style.display = (tipo === "dotacion_dia" || tipo === "personalizada") ? "none" : "";
+  document.getElementById("r-campo-tienda").style.display = (tipo === "horario_fijo" || tipo === "personalizada") ? "none" : "";
+  document.getElementById("r-campo-dias").style.display = (tipo === "personalizada") ? "none" : "";
+  document.getElementById("r-campo-descripcion").style.display = (tipo === "personalizada") ? "" : "none";
+  document.getElementById("r-campo-codigo").style.display = (tipo === "personalizada") ? "" : "none";
+};
+
+window.abrirReglaModal = () => {
+  if(state.empleados.length === 0 || state.tiendas.length === 0){
+    toast("Crea primero empleados y tiendas");
+    return;
+  }
+  openModal(reglaModalHtml());
+};
+
+window.guardarRegla = async () => {
+  const tipo = document.getElementById("r-tipo").value;
+  const dias = [...document.querySelectorAll("#r-dias .day-chip.selected")].map(el => el.dataset.day);
+  const datos = {
+    tipo,
+    obligatoria: document.getElementById("r-obligatoria").value === "true",
+    empleadoId: document.getElementById("r-empleado").value || null,
+    tiendaId: document.getElementById("r-tienda").value || null,
+    dias,
+    valor: tipo === "dotacion_dia" ? Number(document.getElementById("r-valor").value) : null,
+    descripcion: tipo === "personalizada" ? document.getElementById("r-descripcion").value.trim() : "",
+    codigo: tipo === "personalizada" ? document.getElementById("r-codigo").value : "",
+  };
+  if(tipo === "personalizada" && !datos.codigo.trim()){ toast("Escribe el código de la regla"); return; }
+  await reglaService.crear(datos);
+  closeModal();
+  await loadState();
+  toast("Regla creada");
+};
+window.handleAlternarRegla = async (id) => { await reglaService.alternarActiva(id); await loadState(); };
+window.handleEliminarRegla = async (id) => { await reglaService.eliminar(id); await loadState(); toast("Regla eliminada"); };
+
+
+/* ---------------- HORARIOS ---------------- */
+function horariosView(){
+  const puedeGenerar = state.empleados.length > 0 && state.tiendas.length > 0;
+  let tablaHtml = "";
+  let avisosHtml = "";
+  let horasHtml = "";
+  let coberturaHtml = "";
+
+  if(state.horario){
+    const rows = state.empleados.map(emp => {
+      const celdas = DIAS.map(dia => {
+        const t = state.horario.turnos.find(x => x.empleadoId === emp.id && x.dia === dia);
+        if(!t || t.tipo === "descanso") return `<td class="day-cell"><span class="shift-pill rest">Descanso</span></td>`;
+        const tiendaNombre = state.tiendas.find(x => x.id === t.tiendaId)?.nombre ?? "";
+        const texto = t.tipo === "fijo"
+          ? `${t.bloques[0][0]}${t.bloques[0][1] ? "–"+t.bloques[0][1] : ""}`
+          : t.bloques.map(b=>`${b[0]}–${b[1]}`).join(" / ");
+        return `<td class="day-cell"><span class="shift-pill ${t.tipo==='fijo'?'fixed':''}">${texto}</span><div class="muted" style="margin-top:3px;">${tiendaNombre}</div></td>`;
+      }).join("");
+      return `<tr><td><b>${emp.nombre}</b></td>${celdas}</tr>`;
+    }).join("");
+
+    tablaHtml = `<div class="hor-table-wrap"><table class="hor"><thead><tr><th>Empleado</th>${DIAS.map(d=>`<th class="day-col">${d}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+
+    avisosHtml = state.horario.avisos.length === 0
+      ? `<div class="coverage-banner coverage-ok">✓ Todas las restricciones obligatorias se cumplen.</div>`
+      : `<div class="coverage-banner coverage-warn"><div>⚠ Restricciones obligatorias incumplidas:<ul style="margin:6px 0 0 18px;padding:0;">${state.horario.avisos.map(a=>`<li>${a}</li>`).join("")}</ul></div></div>`;
+
+    if(state.horario.preferenciasNoCumplidas && state.horario.preferenciasNoCumplidas.length > 0){
+      avisosHtml += `<div class="coverage-banner coverage-info"><div>💡 Preferencias no cumplidas (no bloquean el horario):<ul style="margin:6px 0 0 18px;padding:0;">${state.horario.preferenciasNoCumplidas.map(a=>`<li>${a}</li>`).join("")}</ul></div></div>`;
+    }
+
+    // Resumen: horas de contrato vs. horas efectivamente planificadas
+    const filasHoras = state.empleados.map(emp => {
+      const efectivas = horasEfectivasEmpleado(emp.id, state.horario.turnos);
+      const diferencia = Math.round((efectivas - emp.horasSemanales) * 100) / 100;
+      const claseDif = diferencia === 0 ? "tag-neutral" : (diferencia < 0 ? "tag-off" : "tag-on");
+      return `<tr>
+        <td><b>${emp.nombre}</b></td>
+        <td>${emp.contrato}h</td>
+        <td>${emp.horasSemanales}h</td>
+        <td>${efectivas}h</td>
+        <td><span class="tag ${claseDif}">${diferencia > 0 ? "+" : ""}${diferencia}h</span></td>
+      </tr>`;
+    }).join("");
+    horasHtml = `
+      <div class="pane" style="margin-bottom:22px;">
+        <h3>Horas de contrato vs. horas efectivas</h3>
+        <p class="sub">"Contrato" es lo pactado; "objetivo semanal" es lo que se intenta cuadrar esa semana; "efectivas" es lo que realmente ha quedado asignado tras repartir la semana en bloques de 3/6/8h. Cuando no coinciden, es porque las horas de contrato no son múltiplo exacto de esos bloques.</p>
+        <table><thead><tr><th>Empleado</th><th>Contrato</th><th>Objetivo semanal</th><th>Horas efectivas</th><th>Diferencia</th></tr></thead>
+        <tbody>${filasHoras}</tbody></table>
+      </div>`;
+
+    // Tres tablas de cobertura, una por tienda: quién está presente en cada franja horaria
+    coberturaHtml = state.tiendas.map(tienda => {
+      const { slots, tabla } = calcularCoberturaTienda(tienda, state.horario.turnos, state.empleados);
+      const filas = slots.map((slot, i) => {
+        const celdas = DIAS.map(dia => {
+          const nombres = tabla[dia][i];
+          return `<td class="day-cell">${nombres.length ? nombres.join("<br>") : "<span class='muted'>—</span>"}</td>`;
+        }).join("");
+        return `<tr><td><b>${minutosATexto(slot[0])}–${minutosATexto(slot[1])}</b></td>${celdas}</tr>`;
+      }).join("");
+      return `
+        <div class="pane" style="margin-bottom:22px;">
+          <h3>Cobertura · ${tienda.nombre}</h3>
+          <p class="sub">Quién está en tienda cada hora, de ${tienda.horaApertura} a ${tienda.horaCierre}.</p>
+          <div class="hor-table-wrap"><table class="hor"><thead><tr><th>Hora</th>${DIAS.map(d=>`<th class="day-col">${d}</th>`).join("")}</tr></thead>
+          <tbody>${filas}</tbody></table></div>
+        </div>`;
+    }).join("");
+  }
+
+  return `
+    <div class="section-head">
+      <div><span class="eyebrow">Motor de planificación</span><h2>Horarios</h2></div>
+    </div>
+    <div class="hor-toolbar">
+      <button class="btn btn-gold" ${puedeGenerar?"":"disabled"} onclick="handleGenerarHorario()">⚙ Generar horario semanal</button>
+      <button class="btn btn-ghost" ${state.horario?"":"disabled"} onclick="handleExportarExcel()">Exportar a Excel</button>
+      <button class="btn btn-ghost" ${state.horario?"":"disabled"} onclick="handleExportarPDF()">Exportar a PDF</button>
+      <button class="btn btn-ghost" onclick="cargarEjemploSinIncidencias()">Cargar ejemplo sin incidencias</button>
+    </div>
+    ${!puedeGenerar ? `<div class="empty-state"><h3>Faltan datos</h3><p>Añade al menos un empleado y una tienda antes de generar el horario.</p></div>` : ""}
+    ${avisosHtml}
+    ${tablaHtml}
+    <div style="height:26px;"></div>
+    ${horasHtml}
+    ${coberturaHtml}
+  `;
+}
+
+window.handleGenerarHorario = async () => {
+  const gen = new GeneradorService(state.empleados, state.tiendas, state.reglas, state.config);
+  const horario = gen.generar();
+  await db.saveHorario(horario);
+  state.horario = horario;
+  render();
+  toast("Horario generado");
+};
+window.handleExportarExcel = () => {
+  new ExportService(state.empleados, state.tiendas).exportarExcel(state.horario);
+};
+window.handleExportarPDF = () => {
+  new ExportService(state.empleados, state.tiendas).exportarPDF();
+};
+
+/* ---------------- CONFIGURACIÓN ---------------- */
+function configView(){
+  return `
+    <div class="section-head">
+      <div><span class="eyebrow">Parámetros globales</span><h2>Configuración</h2></div>
+    </div>
+    <div class="pane" style="margin-bottom:18px;">
+      <h3>Datos de ejemplo sin incidencias</h3>
+      <p class="sub">Sustituye empleados, tiendas y reglas actuales por el ejemplo de 13 personas (con contratos de 25h, 30h y 40h) diseñado para que la generación de horarios no incumpla ninguna restricción obligatoria.</p>
+      <button class="btn btn-gold btn-sm" onclick="cargarEjemploSinIncidencias()">Cargar ejemplo sin incidencias</button>
+    </div>
+    <div class="two-col">
+      <div class="pane">
+        <h3>Dotación exigida por día</h3>
+        <p class="sub">Ya no se configura aquí: ahora se define como una <b>regla</b> más (por ejemplo "Domingos exactamente 9 personas"), y puedes marcarla como obligatoria o como preferencia. Ve a la pestaña <b>Reglas</b>.</p>
+      </div>
+      <div class="pane">
+        <h3>Jornadas permitidas por contrato</h3>
+        <p class="sub">Reglas fijas del negocio, no editables desde aquí.</p>
+        <div class="row" style="display:flex;justify-content:space-between;padding:4px 0;"><span>Contrato 40h</span><b>Jornadas de 8h</b></div>
+        <div class="row" style="display:flex;justify-content:space-between;padding:4px 0;"><span>Contrato 30h / 25h</span><b>Jornadas de 3, 6 u 8h</b></div>
+        <div class="row" style="display:flex;justify-content:space-between;padding:4px 0;"><span>Turnos partidos permitidos</span><b>3+3, 3+5, 5+3, 4+4</b></div>
+        <div class="row" style="display:flex;justify-content:space-between;padding:4px 0;"><span>Presencia mínima en tienda</span><b>Siempre ≥1 persona (obligatorio, no editable)</b></div>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------------- Render principal ---------------- */
+function render(){
+  renderNav();
+  const content = document.getElementById("content");
+  if(state.tab === "empleados") content.innerHTML = empleadosView();
+  else if(state.tab === "tiendas") content.innerHTML = tiendasView();
+  else if(state.tab === "reglas") content.innerHTML = reglasView();
+  else if(state.tab === "horarios") content.innerHTML = horariosView();
+  else if(state.tab === "configuracion") content.innerHTML = configView();
+  else if(state.tab === "chinatagpt"){
+    content.innerHTML = chinatagptView();
+    const hist = document.getElementById("chat-historial");
+    if(hist) hist.scrollTop = hist.scrollHeight;
+  }
+}
+
+async function loadState(){
+  state.empleados = await empleadoService.listar();
+  state.tiendas = await tiendaService.listar();
+  state.reglas = await reglaService.listar();
+  state.config = await db.getConfig();
+  state.horario = await db.getHorario();
+  render();
+}
+
+function renderAll(){ render(); }
+
+/* ---------------- CHINATAGPT ---------------- */
+
+/** Resume todo lo relevante de la app en texto plano para dárselo como contexto al modelo. */
+function construirContextoChinataGPT(){
+  const partes = [];
+
+  partes.push("TIENDAS:");
+  for(const t of state.tiendas){
+    partes.push(`- ${t.nombre}: abre ${t.horaApertura}, cierra ${t.horaCierre}, mínimo ${t.personasApertura} en apertura y ${t.personasCierre} en cierre.`);
+  }
+
+  partes.push("\nEMPLEADOS:");
+  for(const e of state.empleados){
+    const tienda = state.tiendas.find(t => t.id === e.tiendaFija)?.nombre ?? "sin tienda fija";
+    partes.push(`- ${e.nombre}: contrato ${e.contrato}h, objetivo semanal ${e.horasSemanales}h, tienda fija ${tienda}, ${e.puedeCambiarTienda?"puede":"no puede"} cambiar de tienda, ${e.puedeTurnoPartido?"puede":"no puede"} hacer turno partido, descansa ${e.diasDescansoFijos.join(", ")||"—"}${e.horarioFijo?`, horario fijo ${e.horarioFijo}`:""}${e.activo?"":", INACTIVO"}.`);
+  }
+
+  partes.push("\nREGLAS:");
+  for(const r of state.reglas){
+    partes.push(`- [${r.obligatoria?"OBLIGATORIA":"PREFERENCIA"}${r.activa?"":", INACTIVA"}] ${reglaDescripcion(r).replace(/<[^>]+>/g,"")}`);
+  }
+
+  if(state.horario){
+    partes.push("\nHORARIO GENERADO (última vez):");
+    for(const e of state.empleados){
+      const dias = DIAS.map(dia => {
+        const t = state.horario.turnos.find(x => x.empleadoId === e.id && x.dia === dia);
+        if(!t || t.tipo === "descanso") return `${dia}: descanso`;
+        const tienda = state.tiendas.find(x => x.id === t.tiendaId)?.nombre ?? "";
+        const horas = t.bloques.map(b => `${b[0]}-${b[1]}`).join(" y ");
+        return `${dia}: ${horas} en ${tienda}`;
+      });
+      partes.push(`- ${e.nombre}: ${dias.join(" | ")}`);
+    }
+    partes.push(`\nIncidencias obligatorias sin resolver: ${state.horario.avisos.length === 0 ? "ninguna" : state.horario.avisos.join(" / ")}`);
+    partes.push(`Preferencias no cumplidas: ${(state.horario.preferenciasNoCumplidas||[]).length === 0 ? "ninguna" : state.horario.preferenciasNoCumplidas.join(" / ")}`);
+  } else {
+    partes.push("\nTodavía no se ha generado ningún horario esta sesión.");
+  }
+
+  return partes.join("\n");
+}
+
+function chinatagptView(){
+  const mensajes = state.chat.map(m => `
+    <div style="display:flex;${m.role==='user'?'justify-content:flex-end;':''}margin-bottom:12px;">
+      <div style="max-width:75%;padding:10px 14px;border-radius:12px;font-size:13.5px;line-height:1.5;white-space:pre-wrap;
+        ${m.role==='user' ? 'background:var(--olive-700);color:#fff;border-bottom-right-radius:3px;' : 'background:var(--olive-100);color:var(--ink);border-bottom-left-radius:3px;'}">
+        ${m.content.replace(/</g,"&lt;")}
+      </div>
+    </div>`).join("");
+
+  return `
+    <div class="section-head">
+      <div><span class="eyebrow">Asistente</span><h2>ChinataGPT</h2></div>
+    </div>
+    <p class="muted" style="margin-top:-8px;">Conoce a los empleados, las tiendas, las reglas y el último horario generado. Pregúntale, por ejemplo: "¿qué días trabaja Rafa?" o "¿por qué no se cumple la preferencia del lunes?".</p>
+    <div class="pane" style="display:flex;flex-direction:column;height:min(60vh,560px);padding:0;overflow:hidden;">
+      <div id="chat-historial" style="flex:1;overflow-y:auto;padding:20px;">
+        ${state.chat.length === 0 ? `<div class="empty-state" style="border:none;"><h3>Pregúntame lo que quieras</h3><p>Tengo acceso a todos los datos actuales del planificador.</p></div>` : mensajes}
+        ${state.chatCargando ? `<div class="muted" style="padding:4px 0;">ChinataGPT está escribiendo…</div>` : ""}
+      </div>
+      <div style="border-top:1px solid var(--line);padding:14px;display:flex;gap:10px;">
+        <textarea id="chat-input" placeholder="Escribe tu pregunta…" style="flex:1;min-height:44px;max-height:120px;resize:vertical;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensajeChinataGPT();}"></textarea>
+        <button class="btn btn-gold" ${state.chatCargando?"disabled":""} onclick="enviarMensajeChinataGPT()">Enviar</button>
+      </div>
+    </div>`;
+}
+
+window.enviarMensajeChinataGPT = async () => {
+  const input = document.getElementById("chat-input");
+  const texto = input.value.trim();
+  if(!texto || state.chatCargando) return;
+  input.value = "";
+  state.chat.push({ role:"user", content: texto });
+  state.chatCargando = true;
+  render();
+
+  try{
+    const contexto = construirContextoChinataGPT();
+    const systemPrompt = `Eres ChinataGPT, el asistente del "Planificador La Chinata". Respondes preguntas sobre el equipo, las tiendas, las reglas y el horario generado, usando SOLO los datos que te paso a continuación. Si te preguntan algo que no puedes deducir de estos datos, dilo con claridad. Responde en español, de forma breve y concreta.\n\nDATOS ACTUALES:\n${contexto}`;
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: state.chat.map(m => ({ role: m.role, content: m.content })),
+      })
+    });
+    const data = await response.json();
+    const textoRespuesta = (data.content || [])
+      .map(bloque => bloque.type === "text" ? bloque.text : "")
+      .filter(Boolean)
+      .join("\n") || "No he podido generar una respuesta. Inténtalo de nuevo.";
+
+    state.chat.push({ role:"assistant", content: textoRespuesta });
+  }catch(e){
+    state.chat.push({ role:"assistant", content: "Ha habido un problema al contactar con ChinataGPT. Inténtalo de nuevo en unos segundos." });
+  }finally{
+    state.chatCargando = false;
+    render();
+  }
+};
+
+
+/* ---------------------------------------------------------------------
+   Datos de ejemplo (solo si la base está vacía)
+   -----------------------------------------------------------------------
+   Diseñado para que NINGUNA restricción OBLIGATORIA quede incumplida:
+
+   1) Las tiendas tienen una amplitud de exactamente 8h (igual que la
+      jornada larga de un contrato de 40h). Así, cualquier empleado de
+      los tríos principales que trabaje ese día cubre la tienda ENTERA,
+      de apertura a cierre, sin turno partido y sin huecos intermedios.
+      Esto satisface a la vez la cobertura de apertura, la de cierre y
+      la restricción obligatoria "siempre debe haber alguien en tienda".
+
+   2) Cada tienda tiene un trío de empleados a 40h. Cada uno descansa
+      2 días entre semana (nunca domingo) y esos descansos no se
+      solapan entre compañeros de la misma tienda, así que cada día
+      entre semana quedan al menos 2 de los 3 cubriendo (y los 3 los
+      días sin descansos cruzados).
+
+   3) Como ninguno de los 9 del trío descansa en domingo, ese día
+      trabajan los 9 a la vez -> encaja con la regla OBLIGATORIA
+      "domingos exactamente 9 personas".
+
+   4) Refuerzos a tiempo parcial (25h/30h) se añaden por encima, sin
+      ser necesarios para cumplir ninguna restricción obligatoria:
+      solo suman cobertura extra y turno partido (Marc), y siempre
+      descansan en domingo para no romper el recuento exacto de "9".
+
+   5) Se incluye una regla de PREFERENCIA a propósito que NO se cumple
+      (refuerzo de 10 personas los lunes) para que se vea cómo el motor
+      la reporta como aviso informativo sin bloquear el horario.
+   --------------------------------------------------------------------- */
+async function construirEjemploCompatible(){
+  const born = new Tienda({nombre:"Born", horaApertura:"10:00", horaCierre:"18:00", personasApertura:2, personasCierre:2});
+  const diputacion = new Tienda({nombre:"Diputación", horaApertura:"09:30", horaCierre:"17:30", personasApertura:2, personasCierre:2});
+  const raval = new Tienda({nombre:"Raval", horaApertura:"10:00", horaCierre:"18:00", personasApertura:1, personasCierre:2});
+  await db.saveTiendas([born, diputacion, raval]);
+
+  // Patrón de descanso: 2 días entre semana por persona, sin solapes
+  // dentro de la misma tienda, y nunca en domingo.
+  const descansos = [
+    ["Lunes","Jueves"],
+    ["Martes","Viernes"],
+    ["Miércoles","Sábado"],
+  ];
+
+  function crearTrio(nombres, tiendaId){
+    return nombres.map((nombre, i) => new Empleado({
+      nombre, contrato:40, horasSemanales:40, tiendaFija:tiendaId,
+      puedeCambiarTienda:false, puedeTurnoPartido:false, // jornada continua = tienda cubierta entera
+      diasDescansoFijos: descansos[i],
+    }));
+  }
+
+  const [rafa, marta, ivan] = crearTrio(["Rafa","Marta","Iván"], born.id);
+  const [armando, sonia, carlos] = crearTrio(["Armando","Sonia","Carlos"], diputacion.id);
+  const [nathalie, laura, pedro] = crearTrio(["Nathalie","Laura","Pedro"], raval.id);
+
+  const liliana = new Empleado({
+    nombre:"Liliana", contrato:25, horasSemanales:25, tiendaFija:diputacion.id,
+    puedeCambiarTienda:false, puedeTurnoPartido:false,
+    diasDescansoFijos:["Domingo","Lunes"], horarioFijo:"09:30-14:30",
+    observaciones:"Horario fijo, no participa en el reparto automático."
+  });
+
+  // Refuerzos a tiempo parcial (25h y 30h). Siempre descansan en domingo
+  // para no alterar el "exactamente 9 personas" de ese día; el resto de
+  // días solo suman cobertura extra, así que nunca rompen nada.
+  const elena = new Empleado({
+    nombre:"Elena", contrato:25, horasSemanales:25, tiendaFija:born.id,
+    puedeCambiarTienda:false, puedeTurnoPartido:false,
+    diasDescansoFijos:["Miércoles","Sábado","Domingo"],
+    observaciones:"Contrato de 25h, jornada seguida (sin turno partido)."
+  });
+  const marc = new Empleado({
+    nombre:"Marc", contrato:30, horasSemanales:30, tiendaFija:diputacion.id,
+    puedeCambiarTienda:false, puedeTurnoPartido:true,
+    diasDescansoFijos:["Jueves","Domingo"],
+    observaciones:"Contrato de 30h, con turno partido (refuerzo, no crítico para la cobertura)."
+  });
+  const julia = new Empleado({
+    nombre:"Julia", contrato:25, horasSemanales:25, tiendaFija:raval.id,
+    puedeCambiarTienda:false, puedeTurnoPartido:false,
+    diasDescansoFijos:["Martes","Viernes","Domingo"],
+    observaciones:"Contrato de 25h, jornada seguida (sin turno partido)."
+  });
+
+  await db.saveEmpleados([
+    rafa, marta, ivan, armando, sonia, carlos, nathalie, laura, pedro,
+    liliana, elena, marc, julia
+  ]);
+
+  const reglas = [
+    new Regla({tipo:"turno_seguido_tienda", obligatoria:true, empleadoId:rafa.id, tiendaId:born.id, descripcion:"Rafa siempre Born cuando hace turno seguido"}),
+    new Regla({tipo:"horario_fijo", obligatoria:true, empleadoId:liliana.id, descripcion:"Liliana horario fijo"}),
+    new Regla({tipo:"dotacion_dia", obligatoria:true, dias:["Domingo"], valor:9, descripcion:"Domingos trabajan exactamente 9 personas"}),
+    new Regla({tipo:"dotacion_dia", obligatoria:false, dias:["Lunes"], valor:10, descripcion:"Preferiblemente, refuerzo de 10 personas los lunes"}),
+    new Regla({
+      tipo:"personalizada", obligatoria:true,
+      descripcion:"Nadie trabaja los 7 días de la semana",
+      codigo:`for (const emp of empleados) {
+  const diasTrabajados = turnos.filter(t =>
+    t.empleadoId === emp.id && t.tipo !== "descanso"
+  ).length;
+  if (diasTrabajados >= 7) {
+    return { cumple: false, mensaje: emp.nombre + " trabaja los 7 días de la semana." };
+  }
+}
+return { cumple: true };`
+    }),
+  ];
+  await db.saveReglas(reglas);
+  await db.saveConfig({});
+}
+
+async function seedIfEmpty(){
+  const tiendas = await db.getTiendas();
+  if(tiendas.length > 0) return;
+  await construirEjemploCompatible();
+}
+
+/** Sobrescribe TODOS los datos actuales por el ejemplo sin incidencias. */
+window.cargarEjemploSinIncidencias = async () => {
+  if(!confirm("Esto sustituirá empleados, tiendas, reglas y el horario generado por el ejemplo de la Chinata sin incidencias. ¿Continuar?")) return;
+  await db.saveHorario(null);
+  await construirEjemploCompatible();
+  await loadState();
+  toast("Ejemplo sin incidencias cargado");
+};
+
+(async function init(){
+  await seedIfEmpty();
+  await loadState();
+})();
+</script>
+</body>
+</html>
