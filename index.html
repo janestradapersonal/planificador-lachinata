@@ -48,6 +48,8 @@ body{
   display:flex;
   flex-direction:column;
   padding:26px 0;
+  position:relative;
+  z-index:60;
 }
 .brand{
   padding:0 22px 22px 22px;
@@ -285,6 +287,9 @@ table.hor td.day-cell{text-align:center;padding:6px 8px;}
       <h1 id="page-title">Empleados</h1>
       <p id="page-sub">Gestiona el equipo, sus contratos y condiciones.</p>
     </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn btn-ghost btn-sm" onclick="irAHorarios()">Ir a Horarios</button>
+    </div>
   </header>
   <div id="content"></div>
 </div>
@@ -396,11 +401,14 @@ class Empleado {
 }
 
 class Tienda {
-  constructor({id, nombre, horaApertura, horaCierre, personasApertura, personasCierre}){
+  constructor({id, nombre, horaApertura, horaCierre, personasApertura, personasCierre, horarioSemana}){
     this.id = id ?? crypto.randomUUID();
     this.nombre = nombre ?? "";
+    // Horario por defecto (si no se especifica horario semanal)
     this.horaApertura = horaApertura ?? "10:00";
     this.horaCierre = horaCierre ?? "20:00";
+    // Opcional: horario semanal por día, objeto { 'Lunes': {apertura:'09:00', cierre:'18:00'}, ... }
+    this.horarioSemana = horarioSemana ?? null;
     this.personasApertura = personasApertura ?? 1;
     this.personasCierre = personasCierre ?? 1;
   }
@@ -577,24 +585,34 @@ class GeneradorService {
     return plan;
   }
 
-  /** Restricción: patrón de turno partido determinista para una jornada dada. */
+  /** Restricción: patrón de turno partido determinista para una jornada dada.
+   *  Reparte los distintos patrones disponibles entre los compañeros de la
+   *  misma tienda (según su posición en la lista), en vez de dar siempre el
+   *  primero: así, cuando dos compañeros coinciden el mismo día, sus turnos
+   *  partidos se COMPLEMENTAN en vez de dejar el mismo hueco a la misma hora. */
   restriccion_patronPartido(empleado, horasJornada){
     if(!empleado.puedeTurnoPartido) return null;
     const patrones = PATRONES_PARTIDO[horasJornada];
-    return patrones ? patrones[0] : null; // primer patrón válido, sin aleatoriedad
+    if(!patrones) return null;
+    const companeros = this.empleados.filter(e => e.tiendaFija === empleado.tiendaFija && e.puedeTurnoPartido);
+    let indice = companeros.findIndex(e => e.id === empleado.id);
+    if(indice < 0) indice = 0;
+    return patrones[indice % patrones.length];
   }
 
-  /** Restricción: construye los bloques horarios reales a partir de la tienda y el patrón. */
-  restriccion_bloquesHorario(tienda, horasJornada, patron){
-    if(!tienda) return [["09:00", this._sumarHoras("09:00,", horasJornada)]];
-    const apertura = tienda.horaApertura;
+  /** Restricción: construye los bloques horarios reales a partir de la tienda y el patrón.
+   *  Soporta horario por día: se recibe `dia` para calcular apertura/cierre. */
+  restriccion_bloquesHorario(tienda, horasJornada, patron, dia){
+    if(!tienda) return [["09:00", this._sumarHoras("09:00", horasJornada)]];
+    const apertura = getTiendaApertura(tienda, dia);
+    const cierre = getTiendaCierre(tienda, dia);
     if(!patron){
       return [[apertura, this._sumarHoras(apertura, horasJornada)]];
     }
     const [a,b] = patron.split("+").map(Number);
     const bloque1Fin = this._sumarHoras(apertura, a);
-    const inicioBloque2 = this._sumarHoras(tienda.horaCierre, -b);
-    return [[apertura, bloque1Fin], [inicioBloque2, tienda.horaCierre]];
+    const inicioBloque2 = this._sumarHoras(cierre, -b);
+    return [[apertura, bloque1Fin], [inicioBloque2, cierre]];
   }
 
   _sumarHoras(hhmm, delta){
@@ -609,16 +627,18 @@ class GeneradorService {
   /** Restricción OBLIGATORIA: nunca puede haber una franja sin ninguna persona en tienda
    *  durante el horario de apertura. Es la única restricción que no depende de reglas
    *  configurables: siempre está activa. */
-  restriccion_siempreHayAlguien(tienda, turnosDeLaTienda){
-    const slots = generarSlotsHorarios(tienda);
+  restriccion_siempreHayAlguien(tienda, turnosDeLaTienda, dia){
+    const slots = generarSlotsHorarios(tienda, dia);
     const huecos = slots.filter(slot => empleadosEnSlot(turnosDeLaTienda, slot).length === 0);
     return { cumple: huecos.length === 0, huecos: huecos.map(s => `${minutosATexto(s[0])}–${minutosATexto(s[1])}`) };
   }
 
   /** Restricción: cobertura mínima de apertura/cierre por tienda y día (regla de negocio, obligatoria). */
-  restriccion_coberturaTienda(tienda, turnosDeLaTienda){
-    const cubreApertura = t => t.bloques.some(([ini]) => ini <= tienda.horaApertura);
-    const cubreCierre = t => t.bloques.some(([,fin]) => fin >= tienda.horaCierre);
+  restriccion_coberturaTienda(tienda, turnosDeLaTienda, dia){
+    const aperturaHora = getTiendaApertura(tienda, dia);
+    const cierreHora = getTiendaCierre(tienda, dia);
+    const cubreApertura = t => t.bloques.some(([ini]) => ini <= aperturaHora);
+    const cubreCierre = t => t.bloques.some(([,fin]) => fin >= cierreHora);
     const apertura = turnosDeLaTienda.filter(cubreApertura).length;
     const cierre = turnosDeLaTienda.filter(cubreCierre).length;
     return {
@@ -683,7 +703,7 @@ class GeneradorService {
         const tiendaId = this.restriccion_tiendaDelDia(empleado, dia);
         const tienda = this.tiendas.find(t => t.id === tiendaId);
         const patron = this.restriccion_patronPartido(empleado, horasJornada);
-        const bloques = this.restriccion_bloquesHorario(tienda, horasJornada, patron);
+        const bloques = this.restriccion_bloquesHorario(tienda, horasJornada, patron, dia);
         turnos.push(new Turno({
           empleadoId: empleado.id, dia, tiendaId, bloques, horas: horasJornada,
           tipo: patron ? "partido" : "jornada"
@@ -719,12 +739,12 @@ class GeneradorService {
     for(const dia of DIAS){
       for(const tienda of this.tiendas){
         const deLaTienda = turnos.filter(t => t.dia === dia && t.tiendaId === tienda.id && t.tipo !== "descanso");
-        const cob = this.restriccion_coberturaTienda(tienda, deLaTienda);
+        const cob = this.restriccion_coberturaTienda(tienda, deLaTienda, dia);
         if(!cob.cumpleApertura) avisos.push(`${tienda.nombre} · ${dia}: cobertura de apertura ${cob.apertura}/${tienda.personasApertura}.`);
         if(!cob.cumpleCierre) avisos.push(`${tienda.nombre} · ${dia}: cobertura de cierre ${cob.cierre}/${tienda.personasCierre}.`);
 
         // 3) Nunca puede haber una franja sin nadie en tienda (obligatoria, no configurable)
-        const siempre = this.restriccion_siempreHayAlguien(tienda, deLaTienda);
+        const siempre = this.restriccion_siempreHayAlguien(tienda, deLaTienda, dia);
         if(!siempre.cumple){
           avisos.push(`${tienda.nombre} · ${dia}: sin nadie en tienda entre ${siempre.huecos.join(", ")}.`);
         }
@@ -806,11 +826,44 @@ class ExportService {
    Se usan tanto en la GUI (tablas en pantalla) como en la exportación.
    ------------------------------------------------------------------------- */
 
-/** Franjas de 1h entre la apertura y el cierre de una tienda, en minutos. */
-function generarSlotsHorarios(tienda){
-  const inicio = minutosDesde(tienda.horaApertura);
-  const fin = minutosDesde(tienda.horaCierre);
+/** Devuelve la hora de apertura para una tienda en un día concreto (si existe horarioSemana usa ese valor). */
+function getTiendaApertura(tienda, dia){
+  try{
+    if(tienda.horarioSemana && tienda.horarioSemana[dia] && tienda.horarioSemana[dia].apertura) return tienda.horarioSemana[dia].apertura;
+  }catch(e){}
+  return tienda.horaApertura;
+}
+/** Devuelve la hora de cierre para una tienda en un día concreto. */
+function getTiendaCierre(tienda, dia){
+  try{
+    if(tienda.horarioSemana && tienda.horarioSemana[dia] && tienda.horarioSemana[dia].cierre) return tienda.horarioSemana[dia].cierre;
+  }catch(e){}
+  return tienda.horaCierre;
+}
+
+/** Texto representativo del rango horario de la tienda: si no varía devuelve "HH:MM–HH:MM",
+ *  si varía por día devuelve un resumen compacto.
+ */
+function tiendaRangoTexto(tienda){
+  if(!tienda.horarioSemana) return `${tienda.horaApertura}–${tienda.horaCierre}`;
+  const vals = DIAS.map(d => `${getTiendaApertura(tienda,d)}|${getTiendaCierre(tienda,d)}`);
+  const allEqual = vals.every(v => v === vals[0]);
+  if(allEqual) return `${vals[0].split("|")[0]}–${vals[0].split("|")[1]}`;
+  const semana = vals.slice(0,6).every(v => v === vals[0]);
+  if(semana) return `L-S ${vals[0].split("|")[0]}–${vals[0].split("|")[1]} · Dom ${vals[6].split("|")[0]}–${vals[6].split("|")[1]}`;
+  return "Horario semanal variable";
+}
+
+/** Franjas de 1h entre la apertura y el cierre de una tienda, en minutos.
+ *  Si se pasa `dia`, devuelve los slots de ese día; si no, usa los valores por defecto.
+ */
+function generarSlotsHorarios(tienda, dia=null){
+  const apertura = dia ? getTiendaApertura(tienda, dia) : tienda.horaApertura;
+  const cierre = dia ? getTiendaCierre(tienda, dia) : tienda.horaCierre;
+  const inicio = minutosDesde(apertura);
+  const fin = minutosDesde(cierre);
   const slots = [];
+  if(inicio === null || fin === null || fin <= inicio) return slots;
   let t = inicio;
   while(t < fin){
     const siguiente = Math.min(t+60, fin);
@@ -833,18 +886,38 @@ function empleadosEnSlot(turnosDiaTienda, slot){
     return bim < e && bfm > s;
   }));
 }
-/** Matriz hora x día con los nombres presentes en una tienda, franja a franja. */
+/** Matriz hora x día con los nombres presentes en una tienda, franja a franja.
+ *  Soporta horario distinto por día (usa el rango conjunto más amplio de la semana). */
 function calcularCoberturaTienda(tienda, turnosSemana, empleados){
-  const slots = generarSlotsHorarios(tienda);
+  let earliest = Infinity, latest = -Infinity;
+  for(const dia of DIAS){
+    const s = minutosDesde(getTiendaApertura(tienda, dia));
+    const f = minutosDesde(getTiendaCierre(tienda, dia));
+    if(s !== null && s < earliest) earliest = s;
+    if(f !== null && f > latest) latest = f;
+  }
+  if(earliest === Infinity || latest === -Infinity || latest <= earliest) return { slots: [], tabla: {} };
+  const slots = [];
+  let t = earliest;
+  while(t < latest){
+    const siguiente = Math.min(t+60, latest);
+    slots.push([t, siguiente]);
+    t = siguiente;
+  }
   const tabla = {};
   for(const dia of DIAS){
     const turnosDiaTienda = turnosSemana.filter(t => t.dia === dia && t.tiendaId === tienda.id);
-    tabla[dia] = slots.map(slot => empleadosEnSlot(turnosDiaTienda, slot).map(t =>
-      empleados.find(e => e.id === t.empleadoId)?.nombre ?? "?"
-    ));
+    tabla[dia] = slots.map(slot => {
+      const [s,e] = slot;
+      const apertura = minutosDesde(getTiendaApertura(tienda, dia));
+      const cierre = minutosDesde(getTiendaCierre(tienda, dia));
+      if(apertura === null || cierre === null || e <= apertura || s >= cierre) return [];
+      return empleadosEnSlot(turnosDiaTienda, slot).map(t => empleados.find(e => e.id === t.empleadoId)?.nombre ?? "?");
+    });
   }
   return { slots, tabla };
 }
+
 /** Suma de horas realmente asignadas a un empleado en la semana generada. */
 function horasEfectivasEmpleado(empleadoId, turnosSemana){
   return turnosSemana
@@ -1002,8 +1075,7 @@ function tiendasView(){
   const cards = state.tiendas.map(t => `
     <div class="card">
       <h4>${t.nombre}</h4>
-      <div class="row"><span>Apertura</span><b>${t.horaApertura}</b></div>
-      <div class="row"><span>Cierre</span><b>${t.horaCierre}</b></div>
+      <div class="row"><span>Horario</span><b>${tiendaRangoTexto(t)}</b></div>
       <div class="row"><span>Personas apertura</span><b>${t.personasApertura}</b></div>
       <div class="row"><span>Personas cierre</span><b>${t.personasCierre}</b></div>
       <div class="card-actions">
@@ -1265,7 +1337,7 @@ function horariosView(){
       return `
         <div class="pane" style="margin-bottom:22px;">
           <h3>Cobertura · ${tienda.nombre}</h3>
-          <p class="sub">Quién está en tienda cada hora, de ${tienda.horaApertura} a ${tienda.horaCierre}.</p>
+          <p class="sub">Quién está en tienda cada hora — ${tiendaRangoTexto(tienda)}.</p>
           <div class="hor-table-wrap"><table class="hor"><thead><tr><th>Hora</th>${DIAS.map(d=>`<th class="day-col">${d}</th>`).join("")}</tr></thead>
           <tbody>${filas}</tbody></table></div>
         </div>`;
@@ -1314,21 +1386,22 @@ function configView(){
     </div>
     <div class="pane" style="margin-bottom:18px;">
       <h3>Datos de ejemplo sin incidencias</h3>
-      <p class="sub">Sustituye empleados, tiendas y reglas actuales por el ejemplo de 13 personas (con contratos de 25h, 30h y 40h) diseñado para que la generación de horarios no incumpla ninguna restricción obligatoria.</p>
+      <p class="sub">Sustituye empleados, tiendas y reglas actuales por el ejemplo diseñado para que la generación de horarios no incumpla ninguna restricción obligatoria (incluida la nueva regla de turno partido y descanso).</p>
       <button class="btn btn-gold btn-sm" onclick="cargarEjemploSinIncidencias()">Cargar ejemplo sin incidencias</button>
     </div>
     <div class="two-col">
       <div class="pane">
         <h3>Dotación exigida por día</h3>
-        <p class="sub">Ya no se configura aquí: ahora se define como una <b>regla</b> más (por ejemplo "Domingos exactamente 9 personas"), y puedes marcarla como obligatoria o como preferencia. Ve a la pestaña <b>Reglas</b>.</p>
+        <p class="sub">Se define como una <b>regla</b> más (por ejemplo "Domingos exactamente 9 personas"), marcable como obligatoria o preferencia. Ve a la pestaña <b>Reglas</b>.</p>
       </div>
       <div class="pane">
-        <h3>Jornadas permitidas por contrato</h3>
+        <h3>Jornadas y turnos permitidos por contrato</h3>
         <p class="sub">Reglas fijas del negocio, no editables desde aquí.</p>
         <div class="row" style="display:flex;justify-content:space-between;padding:4px 0;"><span>Contrato 40h</span><b>Jornadas de 8h</b></div>
         <div class="row" style="display:flex;justify-content:space-between;padding:4px 0;"><span>Contrato 30h / 25h</span><b>Jornadas de 3, 6 u 8h</b></div>
         <div class="row" style="display:flex;justify-content:space-between;padding:4px 0;"><span>Turnos partidos permitidos</span><b>3+3, 3+5, 5+3, 4+4</b></div>
         <div class="row" style="display:flex;justify-content:space-between;padding:4px 0;"><span>Presencia mínima en tienda</span><b>Siempre ≥1 persona (obligatorio, no editable)</b></div>
+        <div class="row" style="display:flex;justify-content:space-between;padding:4px 0;"><span>Descanso y turno partido</span><b>Cada empleado: ≥1 día partido y ≥2 días de descanso (obligatorio)</b></div>
       </div>
     </div>
   `;
@@ -1361,7 +1434,11 @@ async function loadState(){
 
 function renderAll(){ render(); }
 
+window.irAHorarios = () => { state.tab = 'horarios'; renderAll(); };
+
 /* ---------------- CHINATAGPT ---------------- */
+
+const CHINATA_API_KEY_STORAGE = "chinata_api_key";
 
 /** Resume todo lo relevante de la app en texto plano para dárselo como contexto al modelo. */
 function construirContextoChinataGPT(){
@@ -1369,7 +1446,7 @@ function construirContextoChinataGPT(){
 
   partes.push("TIENDAS:");
   for(const t of state.tiendas){
-    partes.push(`- ${t.nombre}: abre ${t.horaApertura}, cierra ${t.horaCierre}, mínimo ${t.personasApertura} en apertura y ${t.personasCierre} en cierre.`);
+    partes.push(`- ${t.nombre}: ${tiendaRangoTexto(t)}, mínimo ${t.personasApertura} en apertura y ${t.personasCierre} en cierre.`);
   }
 
   partes.push("\nEMPLEADOS:");
@@ -1404,7 +1481,18 @@ function construirContextoChinataGPT(){
   return partes.join("\n");
 }
 
+function getChinataApiKey(){
+  try{ return localStorage.getItem(CHINATA_API_KEY_STORAGE) || ""; }catch(e){ return ""; }
+}
+function setChinataApiKey(key){
+  try{ localStorage.setItem(CHINATA_API_KEY_STORAGE, key); }catch(e){}
+}
+function clearChinataApiKey(){
+  try{ localStorage.removeItem(CHINATA_API_KEY_STORAGE); }catch(e){}
+}
+
 function chinatagptView(){
+  const apiKey = getChinataApiKey();
   const mensajes = state.chat.map(m => `
     <div style="display:flex;${m.role==='user'?'justify-content:flex-end;':''}margin-bottom:12px;">
       <div style="max-width:75%;padding:10px 14px;border-radius:12px;font-size:13.5px;line-height:1.5;white-space:pre-wrap;
@@ -1413,12 +1501,35 @@ function chinatagptView(){
       </div>
     </div>`).join("");
 
+  const configuracionApiKey = `
+    <div class="pane" style="margin-bottom:16px;">
+      <h3>Clave de API de Anthropic</h3>
+      <p class="sub">Este chat se ejecuta enteramente en tu navegador (es un archivo .html que has descargado), así que necesita tu propia clave de la API de Anthropic para funcionar — no la de Claude.ai, sino una clave de <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Se guarda solo en este navegador (localStorage), nunca se envía a ningún sitio salvo directamente a la API de Anthropic.</p>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="chinata-api-key" placeholder="sk-ant-..." value="${apiKey}" style="flex:1;font-family:monospace;">
+        <button class="btn btn-primary btn-sm" onclick="guardarChinataApiKey()">Guardar</button>
+        ${apiKey ? `<button class="btn btn-ghost btn-sm" onclick="borrarChinataApiKey()">Quitar</button>` : ""}
+      </div>
+    </div>`;
+
+  if(!apiKey){
+    return `
+      <div class="section-head">
+        <div><span class="eyebrow">Asistente</span><h2>ChinataGPT</h2></div>
+      </div>
+      <p class="muted" style="margin-top:-8px;">Conoce a los empleados, las tiendas, las reglas y el último horario generado.</p>
+      ${configuracionApiKey}
+      <div class="empty-state"><h3>Añade tu clave de API para empezar</h3><p>Sin ella, el chat no puede contactar con Claude.</p></div>
+    `;
+  }
+
   return `
     <div class="section-head">
       <div><span class="eyebrow">Asistente</span><h2>ChinataGPT</h2></div>
     </div>
-    <p class="muted" style="margin-top:-8px;">Conoce a los empleados, las tiendas, las reglas y el último horario generado. Pregúntale, por ejemplo: "¿qué días trabaja Rafa?" o "¿por qué no se cumple la preferencia del lunes?".</p>
-    <div class="pane" style="display:flex;flex-direction:column;height:min(60vh,560px);padding:0;overflow:hidden;">
+    <p class="muted" style="margin-top:-8px;">Pregúntale, por ejemplo: "¿qué días trabaja Rafa?" o "¿por qué no se cumple la preferencia del lunes?".</p>
+    ${configuracionApiKey}
+    <div class="pane" style="display:flex;flex-direction:column;height:min(55vh,520px);padding:0;overflow:hidden;">
       <div id="chat-historial" style="flex:1;overflow-y:auto;padding:20px;">
         ${state.chat.length === 0 ? `<div class="empty-state" style="border:none;"><h3>Pregúntame lo que quieras</h3><p>Tengo acceso a todos los datos actuales del planificador.</p></div>` : mensajes}
         ${state.chatCargando ? `<div class="muted" style="padding:4px 0;">ChinataGPT está escribiendo…</div>` : ""}
@@ -1430,7 +1541,22 @@ function chinatagptView(){
     </div>`;
 }
 
+window.guardarChinataApiKey = () => {
+  const val = document.getElementById("chinata-api-key").value.trim();
+  if(!val){ toast("Pega una clave válida"); return; }
+  setChinataApiKey(val);
+  toast("Clave guardada en este navegador");
+  render();
+};
+window.borrarChinataApiKey = () => {
+  clearChinataApiKey();
+  toast("Clave eliminada");
+  render();
+};
+
 window.enviarMensajeChinataGPT = async () => {
+  const apiKey = getChinataApiKey();
+  if(!apiKey){ toast("Añade tu clave de API primero"); return; }
   const input = document.getElementById("chat-input");
   const texto = input.value.trim();
   if(!texto || state.chatCargando) return;
@@ -1445,7 +1571,12 @@ window.enviarMensajeChinataGPT = async () => {
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 1000,
@@ -1454,6 +1585,12 @@ window.enviarMensajeChinataGPT = async () => {
       })
     });
     const data = await response.json();
+
+    if(!response.ok){
+      const detalle = data?.error?.message || `Error HTTP ${response.status}`;
+      throw new Error(detalle);
+    }
+
     const textoRespuesta = (data.content || [])
       .map(bloque => bloque.type === "text" ? bloque.text : "")
       .filter(Boolean)
@@ -1461,7 +1598,7 @@ window.enviarMensajeChinataGPT = async () => {
 
     state.chat.push({ role:"assistant", content: textoRespuesta });
   }catch(e){
-    state.chat.push({ role:"assistant", content: "Ha habido un problema al contactar con ChinataGPT. Inténtalo de nuevo en unos segundos." });
+    state.chat.push({ role:"assistant", content: `⚠ Error al contactar con la API de Anthropic: ${e.message}` });
   }finally{
     state.chatCargando = false;
     render();
@@ -1472,99 +1609,131 @@ window.enviarMensajeChinataGPT = async () => {
 /* ---------------------------------------------------------------------
    Datos de ejemplo (solo si la base está vacía)
    -----------------------------------------------------------------------
-   Diseñado para que NINGUNA restricción OBLIGATORIA quede incumplida:
+   Horario real de las tiendas: Lunes a Sábado 10:00–20:00 (10h) y
+   Domingo 12:00–20:00 (8h). Diseñado para que NINGUNA restricción
+   OBLIGATORIA quede incumplida, incluida la nueva regla fija de que
+   todo empleado tenga al menos 1 día de turno partido y 2 de descanso:
 
-   1) Las tiendas tienen una amplitud de exactamente 8h (igual que la
-      jornada larga de un contrato de 40h). Así, cualquier empleado de
-      los tríos principales que trabaje ese día cubre la tienda ENTERA,
-      de apertura a cierre, sin turno partido y sin huecos intermedios.
-      Esto satisface a la vez la cobertura de apertura, la de cierre y
-      la restricción obligatoria "siempre debe haber alguien en tienda".
+   1) Cada tienda tiene 5 empleados a 40h, TODOS con turno partido
+      permitido (así, todos sus días trabajados son automáticamente
+      partido, cumpliendo de sobra la regla de "≥1 día partido").
+      El motor reparte 3 patrones distintos (3+5, 5+3, 4+4) entre los
+      compañeros de una misma tienda, así que cuando coinciden el mismo
+      día, sus turnos se COMPLEMENTAN en vez de dejar el mismo hueco.
+      Con al menos un "3+5" y un "5+3" presentes cualquier día, la
+      cobertura llega de punta a punta de las 10h sin ningún hueco.
 
-   2) Cada tienda tiene un trío de empleados a 40h. Cada uno descansa
-      2 días entre semana (nunca domingo) y esos descansos no se
-      solapan entre compañeros de la misma tienda, así que cada día
-      entre semana quedan al menos 2 de los 3 cubriendo (y los 3 los
-      días sin descansos cruzados).
+   2) Los 5 de cada tienda tienen exactamente 2 días de descanso a la
+      semana. 3 de ellos descansan sábado y domingo distribuidos de forma
+      que cada día laborable siempre queda al menos 1 empleado de tipo
+      "3+5" y 1 de tipo "5+3" trabajando.
 
-   3) Como ninguno de los 9 del trío descansa en domingo, ese día
-      trabajan los 9 a la vez -> encaja con la regla OBLIGATORIA
-      "domingos exactamente 9 personas".
+   3) De los 5 por tienda, exactamente 3 trabajan el domingo (con 2 días
+      de descanso ya consumidos entre semana + domingo libre para los
+      otros 2) -> 3 tiendas x 3 = 9 personas en domingo, cuadrando con
+      la regla OBLIGATORIA "domingos exactamente 9 personas".
 
-   4) Refuerzos a tiempo parcial (25h/30h) se añaden por encima, sin
-      ser necesarios para cumplir ninguna restricción obligatoria:
-      solo suman cobertura extra y turno partido (Marc), y siempre
-      descansan en domingo para no romper el recuento exacto de "9".
-
-   5) Se incluye una regla de PREFERENCIA a propósito que NO se cumple
-      (refuerzo de 10 personas los lunes) para que se vea cómo el motor
-      la reporta como aviso informativo sin bloquear el horario.
+   4) Se añaden refuerzos a tiempo parcial (25h/30h) con turno partido
+      en sus días de 6h, y Liliana con horario fijo (exenta de la nueva
+      regla de partido/descanso, ya que su horario está fijado a mano).
    --------------------------------------------------------------------- */
 async function construirEjemploCompatible(){
-  const born = new Tienda({nombre:"Born", horaApertura:"10:00", horaCierre:"18:00", personasApertura:2, personasCierre:2});
-  const diputacion = new Tienda({nombre:"Diputación", horaApertura:"09:30", horaCierre:"17:30", personasApertura:2, personasCierre:2});
-  const raval = new Tienda({nombre:"Raval", horaApertura:"10:00", horaCierre:"18:00", personasApertura:1, personasCierre:2});
+  const horarioSemanal = {
+    "Lunes":    { apertura: "10:00", cierre: "20:00" },
+    "Martes":   { apertura: "10:00", cierre: "20:00" },
+    "Miércoles":{ apertura: "10:00", cierre: "20:00" },
+    "Jueves":   { apertura: "10:00", cierre: "20:00" },
+    "Viernes":  { apertura: "10:00", cierre: "20:00" },
+    "Sábado":   { apertura: "10:00", cierre: "20:00" },
+    "Domingo":  { apertura: "12:00", cierre: "20:00" },
+  };
+
+  const born = new Tienda({nombre:"Born", horaApertura:"10:00", horaCierre:"20:00", personasApertura:2, personasCierre:2, horarioSemana: horarioSemanal});
+  const diputacion = new Tienda({nombre:"Diputación", horaApertura:"10:00", horaCierre:"20:00", personasApertura:2, personasCierre:2, horarioSemana: horarioSemanal});
+  const raval = new Tienda({nombre:"Raval", horaApertura:"10:00", horaCierre:"20:00", personasApertura:1, personasCierre:2, horarioSemana: horarioSemanal});
   await db.saveTiendas([born, diputacion, raval]);
 
-  // Patrón de descanso: 2 días entre semana por persona, sin solapes
-  // dentro de la misma tienda, y nunca en domingo.
-  const descansos = [
-    ["Lunes","Jueves"],
-    ["Martes","Viernes"],
-    ["Miércoles","Sábado"],
+  // Quinteto por tienda: 2 días de descanso cada uno, 3 trabajan el domingo.
+  // (weekday = días de descanso entre semana; domingo = si descansa el domingo)
+  const patronQuinteto = [
+    { weekday: ["Lunes","Miércoles"], domingo: false },
+    { weekday: ["Martes","Jueves"],   domingo: false },
+    { weekday: ["Sábado"],            domingo: true  }, // 1 entre semana + domingo = 2 descansos
+    { weekday: ["Viernes"],           domingo: true  },
+    { weekday: ["Lunes","Viernes"],   domingo: false },
   ];
 
-  function crearTrio(nombres, tiendaId){
-    return nombres.map((nombre, i) => new Empleado({
-      nombre, contrato:40, horasSemanales:40, tiendaFija:tiendaId,
-      puedeCambiarTienda:false, puedeTurnoPartido:false, // jornada continua = tienda cubierta entera
-      diasDescansoFijos: descansos[i],
-    }));
+  function crearQuinteto(nombres, tiendaId){
+    return nombres.map((nombre, i) => {
+      const p = patronQuinteto[i];
+      const descansos = p.domingo ? [...p.weekday, "Domingo"] : [...p.weekday];
+      return new Empleado({
+        nombre, contrato:40, horasSemanales:40, tiendaFija:tiendaId,
+        puedeCambiarTienda:false, puedeTurnoPartido:true,
+        diasDescansoFijos: descansos,
+      });
+    });
   }
 
-  const [rafa, marta, ivan] = crearTrio(["Rafa","Marta","Iván"], born.id);
-  const [armando, sonia, carlos] = crearTrio(["Armando","Sonia","Carlos"], diputacion.id);
-  const [nathalie, laura, pedro] = crearTrio(["Nathalie","Laura","Pedro"], raval.id);
+  const bornEquipo = crearQuinteto(["Rafa","Marta","Iván","Toni","Cristina"], born.id);
+  const dipuEquipo = crearQuinteto(["Armando","Sonia","Carlos","Bea","Xavi"], diputacion.id);
+  const ravalEquipo = crearQuinteto(["Nathalie","Laura","Pedro","Mireia","David"], raval.id);
 
   const liliana = new Empleado({
     nombre:"Liliana", contrato:25, horasSemanales:25, tiendaFija:diputacion.id,
     puedeCambiarTienda:false, puedeTurnoPartido:false,
     diasDescansoFijos:["Domingo","Lunes"], horarioFijo:"09:30-14:30",
-    observaciones:"Horario fijo, no participa en el reparto automático."
+    observaciones:"Horario fijo: exenta de la regla de turno partido/descanso."
   });
 
-  // Refuerzos a tiempo parcial (25h y 30h). Siempre descansan en domingo
-  // para no alterar el "exactamente 9 personas" de ese día; el resto de
-  // días solo suman cobertura extra, así que nunca rompen nada.
+  // Refuerzos a tiempo parcial (25h/30h). Todos con turno partido activado
+  // (así cumplen también la regla de "≥1 día partido") y siempre descansan
+  // en domingo para no alterar el "exactamente 9 personas" de ese día.
   const elena = new Empleado({
-    nombre:"Elena", contrato:25, horasSemanales:25, tiendaFija:born.id,
-    puedeCambiarTienda:false, puedeTurnoPartido:false,
-    diasDescansoFijos:["Miércoles","Sábado","Domingo"],
-    observaciones:"Contrato de 25h, jornada seguida (sin turno partido)."
+    nombre:"Elena", contrato:30, horasSemanales:30, tiendaFija:born.id,
+    puedeCambiarTienda:false, puedeTurnoPartido:true,
+    diasDescansoFijos:["Miércoles","Domingo"],
+    observaciones:"Contrato de 30h (5 días de 6h, todos con turno partido)."
   });
   const marc = new Empleado({
-    nombre:"Marc", contrato:30, horasSemanales:30, tiendaFija:diputacion.id,
+    nombre:"Marc", contrato:25, horasSemanales:25, tiendaFija:diputacion.id,
     puedeCambiarTienda:false, puedeTurnoPartido:true,
-    diasDescansoFijos:["Jueves","Domingo"],
-    observaciones:"Contrato de 30h, con turno partido (refuerzo, no crítico para la cobertura)."
+    diasDescansoFijos:["Miércoles","Sábado","Domingo"],
+    observaciones:"Contrato de 25h, con turno partido."
   });
   const julia = new Empleado({
     nombre:"Julia", contrato:25, horasSemanales:25, tiendaFija:raval.id,
-    puedeCambiarTienda:false, puedeTurnoPartido:false,
+    puedeCambiarTienda:false, puedeTurnoPartido:true,
     diasDescansoFijos:["Martes","Viernes","Domingo"],
-    observaciones:"Contrato de 25h, jornada seguida (sin turno partido)."
+    observaciones:"Contrato de 25h, con turno partido."
   });
 
   await db.saveEmpleados([
-    rafa, marta, ivan, armando, sonia, carlos, nathalie, laura, pedro,
+    ...bornEquipo, ...dipuEquipo, ...ravalEquipo,
     liliana, elena, marc, julia
   ]);
 
   const reglas = [
-    new Regla({tipo:"turno_seguido_tienda", obligatoria:true, empleadoId:rafa.id, tiendaId:born.id, descripcion:"Rafa siempre Born cuando hace turno seguido"}),
+    new Regla({tipo:"turno_seguido_tienda", obligatoria:true, empleadoId:bornEquipo[0].id, tiendaId:born.id, descripcion:"Rafa siempre Born cuando hace turno seguido"}),
     new Regla({tipo:"horario_fijo", obligatoria:true, empleadoId:liliana.id, descripcion:"Liliana horario fijo"}),
     new Regla({tipo:"dotacion_dia", obligatoria:true, dias:["Domingo"], valor:9, descripcion:"Domingos trabajan exactamente 9 personas"}),
     new Regla({tipo:"dotacion_dia", obligatoria:false, dias:["Lunes"], valor:10, descripcion:"Preferiblemente, refuerzo de 10 personas los lunes"}),
+    new Regla({
+      tipo:"personalizada", obligatoria:true,
+      descripcion:"Todo empleado tiene al menos 1 día de turno partido y 2 días de descanso (los de horario fijo quedan exentos)",
+      codigo:`for (const emp of empleados) {
+  if (emp.horarioFijo && emp.horarioFijo.trim()) continue; // horario fijo: exento
+  const partidos = turnos.filter(t => t.empleadoId === emp.id && t.tipo === "partido").length;
+  const descansos = turnos.filter(t => t.empleadoId === emp.id && t.tipo === "descanso").length;
+  if (partidos < 1) {
+    return { cumple: false, mensaje: emp.nombre + " no tiene ningún día de turno partido." };
+  }
+  if (descansos < 2) {
+    return { cumple: false, mensaje: emp.nombre + " tiene menos de 2 días de descanso." };
+  }
+}
+return { cumple: true };`
+    }),
     new Regla({
       tipo:"personalizada", obligatoria:true,
       descripcion:"Nadie trabaja los 7 días de la semana",
